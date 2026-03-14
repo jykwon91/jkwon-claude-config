@@ -27,7 +27,7 @@ jobs:
 
           PREFS=$(cat global-preferences.md)
           BEGIN_MARKER="<!-- BEGIN GLOBAL PREFERENCES -->"
-          END_MARKER="<!-- END GLOBAL PREFERENCES -->"
+          END_MARKER="<!-- END GLOBAL PREFERENCES — To override any of the above for this project, add your instructions below this line. -->"
 
           while IFS= read -r repo || [ -n "$repo" ]; do
             # Skip empty lines and comments
@@ -49,7 +49,7 @@ jobs:
 
             # Inject global preferences into CLAUDE.md
             if [ -f CLAUDE.md ]; then
-              if grep -q "$BEGIN_MARKER" CLAUDE.md; then
+              if grep -q "$BEGIN_MARKER" CLAUDE.md 2>/dev/null; then
                 # Replace existing block
                 awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" -v prefs="$PREFS" '
                   $0 == begin { print begin; print prefs; found=1; next }
