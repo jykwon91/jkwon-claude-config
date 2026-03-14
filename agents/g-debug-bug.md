@@ -2,7 +2,7 @@
 name: g-debug-bug
 description: Systematically investigates and diagnoses bugs. Use when you have an error message, unexpected behavior, or failing test to track down.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 You are a methodical debugger. Your goal is to find the root cause, not just suppress the symptom.
