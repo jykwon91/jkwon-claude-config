@@ -1,0 +1,58 @@
+name: Sync agents and skills to projects
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'agents/**'
+      - 'skills/**'
+      - 'projects.txt'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout jkwon-claude-config
+        uses: actions/checkout@v4
+
+      - name: Sync to registered projects
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          git config --global user.name "claude-config-sync"
+          git config --global user.email "claude-config-sync@users.noreply.github.com"
+
+          while IFS= read -r repo || [ -n "$repo" ]; do
+            # Skip empty lines and comments
+            [[ -z "$repo" || "$repo" == \#* ]] && continue
+
+            echo "Syncing to $repo..."
+
+            # Clone the target repo
+            git clone "https://x-access-token:${SYNC_TOKEN}@github.com/${repo}.git" target-repo
+            cd target-repo
+
+            # Sync agents
+            mkdir -p .claude/agents
+            cp -r ../agents/. .claude/agents/
+
+            # Sync skills
+            mkdir -p .claude/skills
+            cp -r ../skills/. .claude/skills/
+
+            # Commit and push if there are changes
+            git add .claude/agents .claude/skills
+            if git diff --cached --quiet; then
+              echo "No changes for $repo, skipping."
+            else
+              git commit -m "chore: sync global agents and skills from jkwon-claude-config"
+              git push
+              echo "Pushed to $repo."
+            fi
+
+            cd ..
+            rm -rf target-repo
+
+          done < projects.txt
