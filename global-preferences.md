@@ -1,4 +1,4 @@
-## Global Coding Preferences
+## Global Software Engineering Preferences
 
 - Prefer simple, minimal solutions. Avoid over-engineering.
 - Don't add abstractions, helpers, or utilities unless clearly necessary.
