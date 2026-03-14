@@ -18,20 +18,7 @@ Agents and skills live here as the source of truth. When changes are pushed to t
 
 ## Initial Setup
 
-### 1. Enable Branch Protection
-
-Protect the `main` branch so all changes require a reviewed PR. This prevents unreviewed changes to agents or scripts from reaching developers.
-
-1. Go to `github.com/jykwon91/jkwon-claude-config` > **Settings** > **Branches**
-2. Click **Add branch protection rule**
-3. Branch name pattern: `main`
-4. Enable:
-   - **Require a pull request before merging**
-   - **Require approvals** (at least 1)
-   - **Do not allow bypassing the above settings**
-5. Click **Save changes**
-
-### 2. Create a PAT
+### 1. Create a PAT
 
 The GitHub Action needs a Personal Access Token with write access to all registered repos.
 
@@ -41,7 +28,7 @@ The GitHub Action needs a Personal Access Token with write access to all registe
 4. Name it `claude-config-sync`, check the `repo` scope
 5. Click **Generate token** and copy it — you only see it once
 
-### 3. Add the PAT as a Secret
+### 2. Add the PAT as a Secret
 
 1. Go to `github.com/jykwon91/jkwon-claude-config` > **Settings** > **Secrets and variables** > **Actions**
 2. Click **New repository secret**
