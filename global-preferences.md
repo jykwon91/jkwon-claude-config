@@ -6,3 +6,4 @@
 - Prefer editing existing code over creating new files.
 - Before writing a custom solution, research whether a well-supported, well-maintained library already solves the problem. Suggest it as an option if it fits the exact requirement and doesn't significantly increase project overhead.
 - Always use strict typing. Avoid `any`, implicit types, or loose type definitions.
+- Always remove unused code, files, and directories when making changes — don't leave dead code behind.
