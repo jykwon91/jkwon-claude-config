@@ -9,6 +9,8 @@ on:
       - 'skills/**'
       - 'projects.txt'
       - 'global-preferences.md'
+      - 'hooks/**'
+      - 'onboard.sh'
   workflow_dispatch:
 
 jobs:
@@ -17,6 +19,8 @@ jobs:
     steps:
       - name: Checkout jkwon-claude-config
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Sync to registered projects
         env:
@@ -28,6 +32,14 @@ jobs:
           PREFS=$(cat global-preferences.md)
           BEGIN_MARKER="<!-- BEGIN GLOBAL PREFERENCES -->"
           END_MARKER="<!-- END GLOBAL PREFERENCES — To override any of the above for this project, add your instructions below this line. -->"
+
+          # Build summary of what changed in this push
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          SUMMARY="## Claude Config Sync Summary\n\n**Changed files:**\n"
+          while IFS= read -r f; do
+            SUMMARY="$SUMMARY- \`$f\`\n"
+          done <<< "$CHANGED_FILES"
+          SUMMARY="$SUMMARY\n**Synced to:**\n"
 
           while IFS= read -r repo || [ -n "$repo" ]; do
             # Skip empty lines and comments
@@ -46,6 +58,11 @@ jobs:
             # Sync skills
             mkdir -p .claude/skills
             cp -r ../skills/. .claude/skills/
+
+            # Sync onboard script and hook template
+            cp ../onboard.sh onboard.sh
+            mkdir -p hooks
+            cp ../hooks/post-merge hooks/post-merge
 
             # Inject global preferences into CLAUDE.md
             if [ -f CLAUDE.md ]; then
@@ -67,16 +84,36 @@ jobs:
             fi
 
             # Commit and push if there are changes
-            git add .claude/agents .claude/skills CLAUDE.md
+            git add .claude/agents .claude/skills CLAUDE.md onboard.sh hooks/
             if git diff --cached --quiet; then
               echo "No changes for $repo, skipping."
+              SUMMARY="$SUMMARY- $repo (no changes)\n"
             else
               git commit -m "chore: sync global agents, skills, and preferences from jkwon-claude-config"
               git push
               echo "Pushed to $repo."
+              SUMMARY="$SUMMARY- $repo (updated)\n"
             fi
 
             cd ..
             rm -rf target-repo
 
           done < projects.txt
+
+          # Print summary to workflow log
+          echo -e "$SUMMARY"
+
+      - name: Post sync summary to job summary
+        if: always()
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          echo "## Claude Config Sync" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by push to main**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed files:**" >> $GITHUB_STEP_SUMMARY
+          while IFS= read -r f; do
+            echo "- \`$f\`" >> $GITHUB_STEP_SUMMARY
+          done <<< "$CHANGED_FILES"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See job logs above for per-repo sync results." >> $GITHUB_STEP_SUMMARY

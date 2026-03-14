@@ -19,6 +19,31 @@ The GitHub Action needs a Personal Access Token (PAT) with write access to all r
 4. Value: paste the token
 5. Click **Add secret**
 
+## Branch Protection (Required)
+
+Protect the `main` branch so no one — including you — can push directly. All changes must go through a reviewed PR. This prevents malicious changes to agents, skills, or `install.sh` from reaching developers without review.
+
+1. Go to `github.com/jykwon91/jkwon-claude-config` > **Settings** > **Branches**
+2. Click **Add branch protection rule**
+3. Branch name pattern: `main`
+4. Enable:
+   - **Require a pull request before merging**
+   - **Require approvals** (set to at least 1)
+   - **Do not allow bypassing the above settings**
+5. Click **Save changes**
+
+## Developer Onboarding (One Time Per Machine)
+
+When a developer joins a project, they run `onboard.sh` once from the project directory. This installs a `post-merge` hook that automatically syncs Claude agents and skills to `~/.claude/` after every `git pull` — no further manual steps required.
+
+```bash
+git clone <project-repo>
+cd <project>
+bash onboard.sh
+```
+
+The hook verifies its own integrity via checksum before running. If the hook has been tampered with, it will warn the developer and skip the sync.
+
 ## Registering a Project
 
 Add the repo to `projects.txt`:
