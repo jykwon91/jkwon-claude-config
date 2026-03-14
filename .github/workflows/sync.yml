@@ -1,4 +1,4 @@
-name: Sync agents and skills to projects
+name: Sync agents, skills, and preferences to projects
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - 'agents/**'
       - 'skills/**'
       - 'projects.txt'
+      - 'global-preferences.md'
   workflow_dispatch:
 
 jobs:
@@ -23,6 +24,10 @@ jobs:
         run: |
           git config --global user.name "claude-config-sync"
           git config --global user.email "claude-config-sync@users.noreply.github.com"
+
+          PREFS=$(cat global-preferences.md)
+          BEGIN_MARKER="<!-- BEGIN GLOBAL PREFERENCES -->"
+          END_MARKER="<!-- END GLOBAL PREFERENCES -->"
 
           while IFS= read -r repo || [ -n "$repo" ]; do
             # Skip empty lines and comments
@@ -42,12 +47,31 @@ jobs:
             mkdir -p .claude/skills
             cp -r ../skills/. .claude/skills/
 
+            # Inject global preferences into CLAUDE.md
+            if [ -f CLAUDE.md ]; then
+              if grep -q "$BEGIN_MARKER" CLAUDE.md; then
+                # Replace existing block
+                awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" -v prefs="$PREFS" '
+                  $0 == begin { print begin; print prefs; found=1; next }
+                  $0 == end { if (found) { print end; found=0 } next }
+                  found { next }
+                  { print }
+                ' CLAUDE.md > CLAUDE.md.tmp && mv CLAUDE.md.tmp CLAUDE.md
+              else
+                # Prepend block to existing CLAUDE.md
+                echo -e "${BEGIN_MARKER}\n${PREFS}\n${END_MARKER}\n" | cat - CLAUDE.md > CLAUDE.md.tmp && mv CLAUDE.md.tmp CLAUDE.md
+              fi
+            else
+              # Create CLAUDE.md with just the global preferences
+              echo -e "${BEGIN_MARKER}\n${PREFS}\n${END_MARKER}" > CLAUDE.md
+            fi
+
             # Commit and push if there are changes
-            git add .claude/agents .claude/skills
+            git add .claude/agents .claude/skills CLAUDE.md
             if git diff --cached --quiet; then
               echo "No changes for $repo, skipping."
             else
-              git commit -m "chore: sync global agents and skills from jkwon-claude-config"
+              git commit -m "chore: sync global agents, skills, and preferences from jkwon-claude-config"
               git push
               echo "Pushed to $repo."
             fi
