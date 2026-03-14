@@ -26,6 +26,19 @@ If your preference doesn't fit an existing section, add a new one:
 
 There are no restrictions on categories — just use a clear heading that describes the type of preference.
 
+## Overriding a Global Preference
+
+If a project disagrees with a global preference, add an override in the project's `CLAUDE.md` below the `<!-- END GLOBAL PREFERENCES -->` marker:
+
+```markdown
+<!-- END GLOBAL PREFERENCES -->
+
+## Project Overrides
+- Always add JSDoc comments to all public functions.
+```
+
+Claude Code reads the full file top to bottom. Project-specific instructions placed after the global block take precedence over conflicting global ones. The global block itself is never touched by developers — only the section below it.
+
 ## How It Works
 
 The sync workflow injects the full contents of `global-preferences.md` into each project's `CLAUDE.md` between these markers:
