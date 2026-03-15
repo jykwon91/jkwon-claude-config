@@ -10,7 +10,7 @@ DEST="$HOME/.claude"
 echo "Installing Claude shared config to $DEST..."
 
 # Create destination directories
-mkdir -p "$DEST/agents" "$DEST/skills"
+mkdir -p "$DEST/agents" "$DEST/skills" "$DEST/rules"
 
 # Install agents
 if [ -d "$SCRIPT_DIR/agents" ]; then
@@ -26,6 +26,12 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
     cp "$skill_dir/SKILL.md" "$DEST/skills/$skill_name/SKILL.md"
     echo "  Skill installed: $skill_name"
   done
+fi
+
+# Install rules
+if [ -d "$SCRIPT_DIR/rules" ]; then
+  cp "$SCRIPT_DIR/rules/"*.md "$DEST/rules/"
+  echo "  Rules installed: $(ls "$SCRIPT_DIR/rules/"*.md | xargs -n1 basename | tr '\n' ' ')"
 fi
 
 echo ""
