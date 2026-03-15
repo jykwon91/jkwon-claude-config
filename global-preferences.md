@@ -13,3 +13,4 @@
 - Modularize code by responsibility — each module, file, or function should have a single, well-defined purpose.
 - Structure projects logically — group files by feature or domain, not by file type, so related code lives together.
 - Always write unit tests alongside new code — strive for 100% coverage to protect against regressions and breaking changes.
+- Don't duplicate code — extract repeated logic into a shared function or module rather than copying it.
