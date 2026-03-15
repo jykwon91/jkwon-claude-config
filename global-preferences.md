@@ -12,3 +12,4 @@
 - Separate configuration from code — keep environment-specific values, constants, and magic numbers in dedicated config or constants files, not inline.
 - Modularize code by responsibility — each module, file, or function should have a single, well-defined purpose.
 - Structure projects logically — group files by feature or domain, not by file type, so related code lives together.
+- Always write unit tests alongside new code — strive for 100% coverage to protect against regressions and breaking changes.
