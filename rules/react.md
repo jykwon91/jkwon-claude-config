@@ -1,8 +1,5 @@
 ---
-description: React best practices — auto-loaded when working with React files
-paths:
-  - "**/*.tsx"
-  - "**/*.jsx"
+description: React best practices — loaded globally for all projects
 ---
 
 # React Best Practices
