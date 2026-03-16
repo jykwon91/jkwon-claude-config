@@ -27,3 +27,4 @@
 - Always show a loading state on buttons immediately when clicked — don't wait for the API response to indicate progress.
 - Never block the UI or API responsiveness with background work — offload long-running tasks so users can continue interacting with the application.
 - Always provide visible feedback for every user action — show progress during operations, confirm success on completion, and display clear error messages on failure. Never leave the user wondering if something happened.
+- Always use `date-fns` for date parsing, formatting, and comparison in frontend code — never use raw `new Date()`, `Date.parse()`, or `toLocaleDateString()`.
