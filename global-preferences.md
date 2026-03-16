@@ -14,3 +14,11 @@
 - Structure projects logically — group files by feature or domain, not by file type, so related code lives together.
 - Always write unit tests alongside new code — strive for 100% coverage to protect against regressions and breaking changes.
 - Don't duplicate code — extract repeated logic into a shared function or module rather than copying it.
+- Define one type, model, or interface per file — never group multiple type definitions in a single file.
+- Keep types, constants, and configuration in dedicated directories — never define them inline in component, route, or service files.
+- Follow layered architecture — route/controller handlers should be thin wrappers that delegate to services; services contain business logic and manage sessions; repositories handle all database operations.
+- Never import database or ORM primitives in route handlers — services manage their own data access.
+- Extract reusable UI components for any pattern repeated 3+ times — loading states, empty states, badges, cards.
+- Never define components inline or inside other components — always extract to separate files and import.
+- Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
+- Always validate field names against an explicit allowlist before applying dynamic updates (`setattr`, spread operators, etc.).
