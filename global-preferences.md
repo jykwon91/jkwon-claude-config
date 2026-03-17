@@ -6,7 +6,7 @@
 - Prefer editing existing code over creating new files.
 - Before writing a custom solution, research whether a well-supported, well-maintained library already solves the problem. Suggest it as an option if it fits the exact requirement and doesn't significantly increase project overhead.
 - Always use strict typing. Avoid `any`, implicit types, or loose type definitions.
-- Always remove unused code, files, and directories when making changes — don't leave dead code behind.
+- Always remove unused code, files, directories, imports, type exports, and stale references when making changes — don't leave dead code or orphaned references behind.
 - Write code for readability and maintainability first — optimise for the next developer reading it, not for cleverness.
 - Prefer pure functions — functions with no side effects and deterministic output — unless state or side effects are required.
 - Separate configuration from code — keep environment-specific values, constants, and magic numbers in dedicated config or constants files, not inline.
@@ -28,3 +28,4 @@
 - Never block the UI or API responsiveness with background work — offload long-running tasks so users can continue interacting with the application.
 - Always provide visible feedback for every user action — show progress during operations, confirm success on completion, and display clear error messages on failure. Never leave the user wondering if something happened.
 - Always use `date-fns` for date parsing, formatting, and comparison in frontend code — never use raw `new Date()`, `Date.parse()`, or `toLocaleDateString()`.
+- Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
