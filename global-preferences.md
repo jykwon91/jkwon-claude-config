@@ -20,6 +20,7 @@
 - Never import database or ORM primitives in route handlers — services manage their own data access.
 - Extract reusable UI components for any pattern repeated 3+ times — loading states, empty states, badges, cards.
 - Never define components inline or inside other components — always extract to separate files and import.
+- Avoid prop drilling — use Redux Toolkit (RTK Query for API data, slices for shared UI state) to share state between components instead of threading props through multiple layers.
 - Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
 - Always validate field names against an explicit allowlist before applying dynamic updates (`setattr`, spread operators, etc.).
 - Use toast banners for error and success feedback — never use `alert()` or modal dialogs for operation results.
