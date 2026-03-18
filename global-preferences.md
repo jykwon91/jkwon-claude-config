@@ -8,6 +8,7 @@
 - Always use strict typing. Avoid `any`, implicit types, or loose type definitions.
 - Always remove unused code, files, directories, imports, type exports, and stale references when making changes — don't leave dead code or orphaned references behind.
 - Write code for readability and maintainability first — optimise for the next developer reading it, not for cleverness.
+- Never use hacks or workarounds — always prefer the cleaner, more elegant, and robust approach even if it takes more effort upfront.
 - Prefer pure functions — functions with no side effects and deterministic output — unless state or side effects are required.
 - Separate configuration from code — keep environment-specific values, constants, and magic numbers in dedicated config or constants files, not inline.
 - Modularize code by responsibility — each module, file, or function should have a single, well-defined purpose.
