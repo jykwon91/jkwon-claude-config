@@ -32,3 +32,4 @@
 - Always use `date-fns` for date parsing, formatting, and comparison in frontend code — never use raw `new Date()`, `Date.parse()`, or `toLocaleDateString()`.
 - Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
+- Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.

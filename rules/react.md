@@ -6,6 +6,24 @@ description: React best practices — loaded globally for all projects
 
 Apply these rules when writing or reviewing React code, prioritized by impact.
 
+## CRITICAL — Component Architecture
+
+- One component per file — never define multiple components in the same file.
+- Organize by feature/domain (`features/invoices/`), not by type (`components/buttons/`).
+- Page components are thin orchestrators — they compose feature components, not contain business logic.
+- Extract custom hooks for any reusable stateful logic — never duplicate state patterns across components.
+- Each hook does one thing — no god-hooks managing multiple unrelated concerns.
+- Keep forms, validation schemas, and default values in separate files from form UI components.
+- Side effects live in hooks, not scattered through event handlers and render bodies.
+
+## CRITICAL — State Management
+
+- Server/API state belongs in React Query (or RTK Query) — never in local useState.
+- Shared UI state belongs in Redux slices — never prop-drilled or lifted to distant ancestors.
+- Form state belongs in React Hook Form — never in manual onChange/setState wiring.
+- URL state (filters, pagination, tabs) belongs in the URL via search params — not in component state.
+- Ephemeral UI state (hover, open/closed) is the only thing that belongs in local useState.
+
 ## CRITICAL — Eliminating Waterfalls
 
 - Defer `await` until the point where the result is actually used, not at the top of the function.
