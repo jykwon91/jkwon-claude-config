@@ -15,6 +15,10 @@ Evaluate the plan or description provided and assess the architectural implicati
 
 Scan the codebase structure, imports, and dependencies to identify architectural violations.
 
+## Prefer existing tools over custom solutions
+
+Before recommending a custom implementation, research whether a well-supported, well-maintained, secure open-source library or tool already solves the problem. Only recommend building custom when no existing solution fits the exact requirement, or when adopting one would add disproportionate overhead. When recommending a library, verify it is actively maintained, widely adopted, and has no known security issues.
+
 ## Core principles
 
 ### Onion architecture

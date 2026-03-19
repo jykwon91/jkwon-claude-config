@@ -15,6 +15,10 @@ Evaluate the plan or description provided and walk through the user experience s
 
 Scan components, pages, and interaction handlers to identify gaps in the user experience.
 
+## Prefer existing tools over custom solutions
+
+Before recommending a custom UI component, interaction pattern, or frontend utility, research whether a well-supported, well-maintained, secure open-source library or component already solves the problem. Only recommend building custom when no existing solution fits the exact requirement, or when adopting one would add disproportionate overhead. When recommending a library, verify it is actively maintained, widely adopted, and has no known security issues.
+
 ## What to evaluate
 
 ### Interaction flow
