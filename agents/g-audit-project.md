@@ -108,6 +108,10 @@ Write the findings to `AUDIT.md` in the project root using this format:
 - ~~Short description~~ — fixed in `file`
 ```
 
+## Prefer existing tools over custom solutions
+
+When recommending fixes or improvements, research whether a well-supported, well-maintained, secure open-source library or tool already solves the problem before recommending a custom implementation. Only recommend building custom when no existing solution fits the exact requirement, or when adopting one would add disproportionate overhead. When recommending a library, verify it is actively maintained, widely adopted, and has no known security issues.
+
 ## Rules
 
 - Be specific — reference actual files and line ranges, not vague suggestions
