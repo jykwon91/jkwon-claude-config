@@ -11,6 +11,7 @@ on:
       - 'global-preferences.md'
       - 'hooks/**'
       - 'onboard.sh'
+      - 'uninstall.sh'
   workflow_dispatch:
 
 jobs:
@@ -59,8 +60,9 @@ jobs:
             mkdir -p .claude/skills
             cp -r ../skills/. .claude/skills/
 
-            # Sync onboard script and hook template
+            # Sync scripts and hook template
             cp ../onboard.sh onboard.sh
+            cp ../uninstall.sh uninstall.sh
             mkdir -p hooks
             cp ../hooks/post-merge hooks/post-merge
 
@@ -84,7 +86,7 @@ jobs:
             fi
 
             # Commit and push if there are changes
-            git add .claude/agents .claude/skills CLAUDE.md onboard.sh hooks/
+            git add .claude/agents .claude/skills CLAUDE.md onboard.sh uninstall.sh hooks/
             if git diff --cached --quiet; then
               echo "No changes for $repo, skipping."
               SUMMARY="$SUMMARY- $repo (no changes)\n"
