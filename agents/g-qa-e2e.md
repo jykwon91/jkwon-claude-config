@@ -187,35 +187,81 @@ Maintain fixtures covering every document type, file format, and vendor category
 - **XLSX/CSV** — spreadsheet with transaction rows
 - **Multi-file ZIP** — multiple documents in one upload
 
-**By vendor/expense category (invoices & receipts):**
-- **Maintenance** — plumber, electrician, handyman, HVAC repair
-- **Utilities** — electric bill, water bill, gas bill, internet
-- **Insurance** — homeowner's policy, landlord insurance
-- **Management fee** — property management company monthly invoice
-- **Cleaning** — cleaning service invoice (turnover cleaning)
-- **Mortgage** — lender statement showing interest/principal split
-- **Taxes** — property tax bill, county tax assessment
-- **Channel fee** — Airbnb/VRBO service fee statement
-- **Contract work** — contractor invoice (landscaping, painting, renovation)
-- **Advertising** — marketing/listing promotion invoice
-- **Legal/professional** — attorney invoice, CPA invoice, inspection fee
-- **Travel** — mileage log, gas receipt, hotel for property visit
-- **Furnishings** — furniture receipt, appliance purchase
+**By user type / tax schedule:**
 
-**By revenue type:**
-- **Rental revenue** — tenant rent payment receipt/confirmation
-- **Cleaning fee revenue** — guest cleaning fee from platform payout
-- **Platform payout** — Airbnb/VRBO payout statement with revenue breakdown
+The app serves multiple user types. Test fixtures must cover documents specific to each:
+
+**Rental property owners (Schedule E):**
+- Maintenance — plumber, electrician, handyman, HVAC repair
+- Utilities — electric bill, water bill, gas bill, internet
+- Insurance — landlord/homeowner's policy
+- Management fee — property management company monthly invoice
+- Cleaning — cleaning service invoice (turnover cleaning)
+- Mortgage — lender statement showing interest/principal split
+- Taxes — property tax bill, county tax assessment
+- Channel fee — Airbnb/VRBO service fee statement
+- Contract work — landscaping, painting, renovation contractor
+- Advertising — listing promotion invoice
+- Legal/professional — attorney, CPA, home inspection
+- Travel — mileage log, gas receipt, hotel for property visit
+- Furnishings — furniture receipt, appliance purchase
+- Rental revenue — tenant rent payment receipt
+- Cleaning fee revenue — guest cleaning fee from platform
+- Platform payout — Airbnb/VRBO payout with revenue breakdown
+- Year-end statement — Airbnb/VRBO annual summary (→ reservations, not expenses)
+
+**Self-employed / freelancers (Schedule C):**
+- Business revenue — client invoice payment, consulting fee
+- Office supplies — Staples receipt, Amazon business purchase
+- Software subscriptions — SaaS invoices (QuickBooks, Adobe, Slack)
+- Home office — internet bill, phone bill (partial deduction)
+- Business meals — restaurant receipt with client name noted
+- Professional services — attorney, CPA, bookkeeper invoice
+- Advertising/marketing — Google Ads invoice, Facebook Ads
+- Vehicle expenses — gas receipts, auto repair, mileage log
+- Equipment — computer purchase, camera, tools
+- Cost of goods sold — material/inventory purchase for resale
+- Contract labor — subcontractor invoice (1099-NEC relevant)
+- Business insurance — liability, E&O, professional coverage
+- Education/training — course receipt, conference registration
+
+**1099 contractors:**
+- 1099-NEC — non-employee compensation from client
+- 1099-MISC — royalties, rent, other income
+- 1099-K — payment card/third-party network transactions (Stripe, PayPal, Venmo)
+- Quarterly estimated tax payment — IRS payment confirmation
+- Self-employment tax — SE tax calculation worksheet
+
+**Investors (Schedule D):**
+- 1099-B — brokerage statement showing capital gains/losses
+- 1099-DIV — dividend income statement
+- 1099-INT — interest income statement
+- Stock purchase confirmation — cost basis documentation
+- Crypto exchange statement — buy/sell transactions
+
+**W-2 employees:**
+- W-2 form — employer wage/tax statement
+- Educator expense receipt — classroom supply purchase (up to $300)
+- Unreimbursed business expense — (limited after TCJA, but still exists for some)
+
+**Tax forms (all user types):**
+- 1099-NEC, 1099-MISC, 1099-K, 1099-B, 1099-DIV, 1099-INT
+- W-2
+- 1098 — mortgage interest statement
+- Property tax statement
 
 **Edge cases:**
-- **Multi-item invoice** — one PDF with 3 line items → should produce 3 transactions
-- **Zero amount** — a credit memo or refund with $0.00 balance
+- **Multi-item invoice** — one PDF with 3 line items → 3 transactions
+- **Zero amount** — credit memo or refund with $0.00
 - **Very large amount** — $50,000+ renovation invoice
-- **Foreign currency** — invoice in CAD/EUR (should note currency or convert)
-- **Handwritten receipt** — poor quality image, tests extraction confidence
-- **Duplicate upload** — same document uploaded twice, should detect duplicate
+- **Foreign currency** — invoice in CAD/EUR
+- **Handwritten receipt** — poor quality image, tests vision extraction
+- **Duplicate upload** — same document twice, should detect
 - **Empty PDF** — no extractable text, should fall back to vision or fail gracefully
-- **Mixed document** — PDF with both invoice and lease info on same page
+- **Mixed document** — PDF with both invoice and lease info
+- **Partial information** — receipt with no vendor name or date cut off
+- **Multiple businesses** — documents for different business activities from same user
+- **Personal vs business** — personal grocery receipt uploaded by mistake (should flag or categorize as non-deductible)
 
 ### When extraction is wrong
 
