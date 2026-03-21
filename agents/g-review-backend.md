@@ -30,6 +30,7 @@ You are a senior backend engineer reviewing Python/FastAPI/SQLAlchemy code for a
 - Missing `await` on async calls (fire-and-forget without intention)
 - **Data-loss patterns** — code that drops, nullifies, or overwrites valid source data to avoid constraint violations (e.g., setting a field to None because another field is missing). The fix should be the field mapping or the constraint, never the data.
 - **Field mapping mismatches** — code that reads extraction/API output using hardcoded keys without checking what keys the source actually returns (causes silent data loss)
+- **Inline imports** — imports inside function bodies (`from app.services.x import y` inside a function). All imports belong at the top of the file. If there's a circular import, flag it as an architecture issue to fix, not hide.
 
 ### Consider
 - Services that open multiple `AsyncSessionLocal()` per operation (should use UoW)

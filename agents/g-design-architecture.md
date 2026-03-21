@@ -76,6 +76,7 @@ Before recommending a custom implementation, research whether a well-supported, 
 - Do all dependencies point inward (toward the domain)?
 - Are external libraries isolated behind interfaces?
 - Can infrastructure be swapped without touching business logic?
+- Are there inline imports inside functions? All imports belong at module level. Inline imports indicate a circular dependency — flag the architecture issue rather than hiding it with a lazy import.
 
 ### React frontend architecture
 - Are components organized by feature/domain, not by type (no `components/buttons/`, yes `features/invoices/`)?
