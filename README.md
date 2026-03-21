@@ -1,93 +1,70 @@
 # jkwon-claude-config
 
-Shared Claude Code configuration for all projects. Contains global agents and skills that are automatically synced to registered project repos.
+Shared Claude Code configuration for all projects. Contains global agents, skills, rules, and preferences that are automatically synced to registered project repos.
 
-## How It Works
+## Quick Start
 
-Agents and skills live here as the source of truth. When changes are pushed to this repo, a GitHub Action automatically pushes the updated files to `.claude/agents/` and `.claude/skills/` in every registered project. Developers get the latest agents with a normal `git pull` — no setup steps required.
-
-## Structure
-
-- `agents/` — Global subagent definitions
-- `skills/` — Global slash command skills
-- `hooks/` — Git hook templates synced to registered projects
-- `projects.txt` — Registry of project repos that receive agent/skill syncs
-- `onboard.sh` — One-time developer setup script (installs the post-merge hook)
-- `install.sh` — Installs agents/skills to `~/.claude/` on your local machine (for personal use)
-- `.github/workflows/sync.yml` — GitHub Action that syncs agents/skills to registered projects on push
-
-## Initial Setup
-
-### 1. Create a PAT
-
-The GitHub Action needs a Personal Access Token with write access to all registered repos.
-
-1. Go to GitHub > avatar menu > **Settings**
-2. Scroll to **Developer settings** > **Personal access tokens** > **Tokens (classic)**
-3. Click **Generate new token (classic)**
-4. Name it `claude-config-sync`, check the `repo` scope
-5. Click **Generate token** and copy it — you only see it once
-
-### 2. Add the PAT as a Secret
-
-1. Go to `github.com/jykwon91/jkwon-claude-config` > **Settings** > **Secrets and variables** > **Actions**
-2. Click **New repository secret**
-3. Name: `SYNC_TOKEN`, Value: paste the token
-4. Click **Add secret**
-
-## Developer Onboarding (One Time Per Machine)
-
-When a developer joins a project, they run `onboard.sh` once from the project directory:
+**If your project repo is registered** (has `onboard.sh` in its root):
 
 ```bash
-git clone <project-repo>
 cd <project>
 bash onboard.sh
 ```
 
-This installs a `post-merge` hook that automatically syncs Claude agents and skills to `~/.claude/` after every `git pull`. The hook verifies its own checksum before running — if it has been tampered with, it warns and skips.
+**If your project repo is NOT registered** (you don't own it, or it hasn't been set up):
 
-## Registering a New Project
-
-Add the repo to `projects.txt` and push:
-
-```
-jykwon91/MyBookkeeper
-jykwon91/your-new-project
+```bash
+git clone git@github.com:jykwon91/jkwon-claude-config.git
+cd jkwon-claude-config
+bash install.sh
 ```
 
-The GitHub Action will sync agents, skills, and `onboard.sh` to the new project automatically.
+Both methods install agents, skills, and rules to `~/.claude/` and set up auto-sync on future `git pull`s. See [Developer Onboarding](docs/onboarding.md) for full details.
 
-**PAT access notes:**
-- Your own repos — covered by the `repo` scope
-- Org repos — PAT owner needs write access; may need SSO authorization under GitHub > Settings > Personal access tokens > **Configure SSO**
-- Others' repos — only works if the PAT owner has been granted write access
+**To uninstall:**
 
-## Adding a New Agent
-
-Create `agents/<name>.md` with this frontmatter:
-
-```yaml
----
-name: agent-name
-description: One sentence — when Claude should use this agent
-tools: Read, Grep, Glob
-model: sonnet
----
+```bash
+bash uninstall.sh
 ```
 
-Push to main via PR — the GitHub Action will sync it to all registered projects automatically.
+## How It Works
 
-## Adding a New Skill
+This repo is the **single source of truth** for Claude Code configuration. There are two distribution channels:
 
-Create `skills/<name>/SKILL.md` with:
+1. **GitHub Action → Project Repos** — When changes are pushed to `main`, a GitHub Action syncs agents, skills, preferences, and hooks to every repo listed in `projects.txt`. Requires write access to the target repos.
+2. **Direct install → Developer Machine** — Developers who clone this config repo run `install.sh` once. A post-merge hook auto-syncs `~/.claude/` on future `git pull`s. Works for any project, including repos you don't own.
 
-```yaml
----
-name: skill-name
-description: When this skill should be invoked
-argument-hint: "[optional-arg]"
----
+```
+1. Developer edits agents/skills/preferences in this repo
+2. Opens PR → merges to main
+3. GitHub Action syncs changes to all registered project repos
+4. Developers run `git pull` (in the project repo or this config repo)
+5. post-merge hook detects changes and copies them to ~/.claude/
+6. Claude Code picks up the new config on next session
 ```
 
-Push to main via PR — the GitHub Action will sync it to all registered projects automatically.
+## Structure
+
+```
+jkwon-claude-config/
+  ├── agents/              — Global subagent definitions
+  ├── skills/              — Global slash command skills
+  ├── rules/               — Global rules files
+  ├── hooks/post-merge     — Git hook template for registered project repos
+  ├── global-preferences.md — Engineering preferences injected into project CLAUDE.md files
+  ├── projects.txt         — Registry of repos that receive syncs (repos you own)
+  ├── install.sh           — Install to ~/.claude/ + set up auto-sync (works for any repo)
+  ├── uninstall.sh         — Remove all config installed by this repo
+  ├── onboard.sh           — One-time setup for registered project repos
+  └── .github/workflows/sync.yml
+```
+
+## Guides
+
+| Guide | Audience | Description |
+|-------|----------|-------------|
+| [Onboarding: Owned Repos](docs/onboarding-owned-repos.md) | Developers | Setup for project repos your team owns |
+| [Onboarding: External Repos](docs/onboarding-external-repos.md) | Developers | Setup for repos you don't own |
+| [Uninstalling](docs/uninstalling.md) | Developers | Remove all config from your machine |
+| [Admin Setup](docs/admin.md) | Repo admins | PAT creation, secrets, registering new projects |
+| [Contributing](docs/contributing.md) | Everyone | Adding agents, skills, preferences, and rules |
