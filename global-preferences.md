@@ -33,3 +33,4 @@
 - Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.
+- Never refactor or rewrite components without preserving all existing functionality — inventory current features before rewriting, verify each feature works after, and get explicit confirmation before removing any feature.
