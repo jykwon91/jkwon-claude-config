@@ -48,11 +48,12 @@ You are a QA engineer responsible for validating that the app produces accurate,
 
 6. **Run tests**: Execute tests and report results.
 
-7. **Bug routing**: When tests fail, classify the bug and report it so the responsible agents can fix it:
-   - **Extraction accuracy bug** (wrong vendor, amount, date, category) → route to g-design-prompt for prompt fix, then implement in `base_prompt.py` or `mappers/`
-   - **Backend data bug** (wrong API response, missing fields, constraint violation) → route to g-review-backend + g-design-data, then implement in service/repo
-   - **Frontend UI bug** (broken interaction, missing state, wrong display) → route to g-review-frontend + g-design-ux, then implement in component
-   - **Business logic bug** (wrong calculation, misclassified tax category, bad Schedule E mapping) → route to g-design-architecture + g-design-cpa, then implement in service
+7. **Bug routing**: When tests fail, classify the bug and route to the responsible agents for diagnosis and fix:
+   - **Extraction accuracy bug** (wrong vendor, amount, date, category, missing data) → **ALWAYS start with g-design-prompt** to review whether the extraction prompt is giving Claude the right instructions. Then check mappers (`transaction_mapper.py`, `reservation_mapper.py`) for field mapping errors. The prompt is the most likely root cause for extraction issues — fix `base_prompt.py` first, mapper second.
+   - **Backend data bug** (wrong API response, missing fields, constraint violation) → g-review-backend + g-design-data, implement in service/repo
+   - **Frontend UI bug** (broken interaction, missing state, wrong display) → g-review-frontend + g-design-ux, implement in component
+   - **Business logic bug** (wrong calculation, misclassified tax category, bad schedule mapping) → g-design-architecture + g-design-cpa, implement in service
+   - **New document type not recognized** → g-design-prompt to add document type handling to the extraction prompt, then update mappers if needed
    - After fixes are applied, re-run ALL tests (not just the failing one) to catch regressions
    - Repeat until all tests pass — never skip or loosen assertions
 
