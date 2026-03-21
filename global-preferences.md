@@ -31,6 +31,7 @@
 - Never block the UI or API responsiveness with background work — offload long-running tasks so users can continue interacting with the application.
 - Always provide visible feedback for every user action — show progress during operations, confirm success on completion, and display clear error messages on failure. Never leave the user wondering if something happened.
 - Always use `date-fns` for date parsing, formatting, and comparison in frontend code — never use raw `new Date()`, `Date.parse()`, or `toLocaleDateString()`.
+- Always run the QA agent (`g-qa-e2e`) after implementing frontend features to write and run E2E tests that validate functionality — if tests fail or bugs are found, fix them before committing.
 - Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.
