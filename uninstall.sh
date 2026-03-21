@@ -119,9 +119,32 @@ esac
 
 # --- Remove hidden config repo clone ---
 if [ -d "$CONFIG_REPO" ]; then
-  rm -rf "$CONFIG_REPO"
-  echo "  Removed config repo clone: $CONFIG_REPO"
-  REMOVED=$((REMOVED + 1))
+  # Check if we're running from inside the config repo clone
+  case "$SCRIPT_DIR" in
+    "$CONFIG_REPO"*)
+      # On Windows, can't delete a directory while a script inside it is running.
+      # Schedule deletion after this script exits.
+      case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+          # Use cmd /c start to delete after this process exits
+          cmd //c "start /min cmd /c \"timeout /t 2 /nobreak >nul & rmdir /s /q \"${CONFIG_REPO//\//\\}\"\"" 2>/dev/null
+          echo "  Config repo clone will be removed shortly: $CONFIG_REPO"
+          REMOVED=$((REMOVED + 1))
+          ;;
+        *)
+          # Unix: safe to delete while running — file handles keep working
+          rm -rf "$CONFIG_REPO"
+          echo "  Removed config repo clone: $CONFIG_REPO"
+          REMOVED=$((REMOVED + 1))
+          ;;
+      esac
+      ;;
+    *)
+      rm -rf "$CONFIG_REPO"
+      echo "  Removed config repo clone: $CONFIG_REPO"
+      REMOVED=$((REMOVED + 1))
+      ;;
+  esac
 fi
 
 echo ""
