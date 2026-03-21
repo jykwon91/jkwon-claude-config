@@ -61,6 +61,15 @@ Before recommending a custom UI component, interaction pattern, or frontend util
 - Failure: "I wasn't able to figure that out." not "Error: extraction failed."
 - Is the tone consistent across all AI touchpoints?
 
+### Mobile responsiveness
+- Do all touch targets meet the 44x44px minimum? Check for icon-only buttons with insufficient padding (p-1, p-1.5).
+- Does the layout work on 375px screens? Check for min-width values on tables and fixed-width elements.
+- Do data tables hide low-priority columns on mobile or switch to card-based layouts?
+- Do interactive elements support touch events alongside mouse events? Check for mouse-only drag interactions.
+- Are fixed-position elements (footers, toasts) aware of mobile keyboard and safe areas?
+- Is there a camera-first upload path on mobile where document capture is a key workflow?
+- Do filters/actions collapse behind a button or bottom sheet on mobile instead of wrapping?
+
 ### Component design
 - Are reusable patterns extracted for repeated UI (loading states, empty states, badges, cards)?
 - Are components focused on a single responsibility?
