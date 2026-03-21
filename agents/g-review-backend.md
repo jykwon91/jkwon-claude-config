@@ -28,6 +28,8 @@ You are a senior backend engineer reviewing Python/FastAPI/SQLAlchemy code for a
 - Computed/generated columns used without SQLite compatibility in tests
 - `async def` functions that block on synchronous I/O without `asyncio.to_thread`
 - Missing `await` on async calls (fire-and-forget without intention)
+- **Data-loss patterns** — code that drops, nullifies, or overwrites valid source data to avoid constraint violations (e.g., setting a field to None because another field is missing). The fix should be the field mapping or the constraint, never the data.
+- **Field mapping mismatches** — code that reads extraction/API output using hardcoded keys without checking what keys the source actually returns (causes silent data loss)
 
 ### Consider
 - Services that open multiple `AsyncSessionLocal()` per operation (should use UoW)

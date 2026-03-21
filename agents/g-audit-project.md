@@ -23,6 +23,8 @@ Systematically review the entire codebase:
 - Pydantic/SQLAlchemy alignment and strict typing
 - Migration safety, data integrity constraints
 - N+1 query risks, inefficient access patterns
+- Data-loss patterns — code that drops, nullifies, or overwrites valid source data to satisfy constraints instead of fixing the field mapping or constraint
+- Field mapping gaps — extraction/API output keys that don't match what the code expects (causes silent data loss)
 
 **Software architecture** (layers, modules, dependencies):
 - Onion architecture violations — business logic in routes, DB imports in handlers, infrastructure leaking into domain
