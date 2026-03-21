@@ -8,7 +8,11 @@ This guide covers how to remove all shared Claude Code config from your machine.
 bash uninstall.sh
 ```
 
-Run it from this config repo or from any project repo that has the script.
+Run it from this config repo, from any project repo that has the script, or from the hidden clone:
+
+```bash
+bash ~/.claude/.config-repo/uninstall.sh
+```
 
 ## What It Removes
 
@@ -16,6 +20,8 @@ Run it from this config repo or from any project repo that has the script.
 - All skill directories from `~/.claude/skills/` that match directories in this repo
 - All rule files from `~/.claude/rules/` that match files in this repo
 - The `post-merge` hook and its checksum from the current repo's `.git/hooks/`
+- The daily auto-sync job (cron on macOS/Linux, Scheduled Task on Windows)
+- The hidden config repo clone at `~/.claude/.config-repo/`
 
 ## What It Does NOT Touch
 
@@ -26,13 +32,14 @@ Run it from this config repo or from any project repo that has the script.
 
 ## If You Have Multiple Onboarded Projects
 
-`uninstall.sh` only removes the hook from the repo you run it in. To remove hooks from all projects, run it in each one:
+`uninstall.sh` only removes the post-merge hook from the repo you run it in. To remove hooks from all projects, run it in each one:
 
 ```bash
 cd ~/projects/project-a && bash uninstall.sh
 cd ~/projects/project-b && bash uninstall.sh
-cd ~/jkwon-claude-config && bash uninstall.sh
 ```
+
+The daily sync job and hidden repo clone are only removed once (they're shared across all projects).
 
 ## Removing Global Preferences from a Project's CLAUDE.md
 
@@ -49,8 +56,15 @@ This is a manual edit — `uninstall.sh` does not modify project files.
 ## Verify Uninstall Worked
 
 ```bash
-ls ~/.claude/agents/    # should be empty or missing the shared agents
-ls ~/.claude/skills/    # should be empty or missing the shared skills
-ls ~/.claude/rules/     # should be empty or missing the shared rules
-ls .git/hooks/post-merge  # should say "No such file or directory"
+ls ~/.claude/agents/          # should be empty or missing the shared agents
+ls ~/.claude/skills/          # should be empty or missing the shared skills
+ls ~/.claude/rules/           # should be empty or missing the shared rules
+ls .git/hooks/post-merge      # should say "No such file or directory"
+ls ~/.claude/.config-repo     # should say "No such file or directory"
+
+# macOS/Linux
+crontab -l | grep claude-config-sync    # should return nothing
+
+# Windows (Git Bash)
+schtasks /query /tn claude-config-sync  # should say task does not exist
 ```

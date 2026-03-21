@@ -1,12 +1,29 @@
 #!/bin/bash
 # Installs shared Claude agents, skills, and rules to ~/.claude
-# Also installs a post-merge hook so future git pulls auto-sync
+# Clones the config repo if needed and sets up daily auto-sync
 # Works on Windows (Git Bash), macOS, and Linux
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/jykwon91/jkwon-claude-config.git"
 DEST="$HOME/.claude"
+CONFIG_REPO="$DEST/.config-repo"
+SYNC_MARKER="claude-config-sync"
+
+# If run from a local clone, use that as the source
+# Otherwise, clone/pull the repo into ~/.claude/.config-repo
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/agents/g-review-code.md" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  SCRIPT_DIR="$CONFIG_REPO"
+  echo "Fetching latest config..."
+  if [ -d "$CONFIG_REPO/.git" ]; then
+    git -C "$CONFIG_REPO" pull -q
+  else
+    git clone -q "$REPO_URL" "$CONFIG_REPO"
+  fi
+  echo ""
+fi
 
 echo "Installing Claude shared config to $DEST..."
 echo ""
@@ -36,26 +53,47 @@ if [ -d "$SCRIPT_DIR/rules" ]; then
   echo "  Rules installed: $(ls "$SCRIPT_DIR/rules/"*.md | xargs -n1 basename | tr '\n' ' ')"
 fi
 
-# Install post-merge hook for auto-sync on git pull
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "")"
-if [ -n "$REPO_ROOT" ]; then
-  HOOK_DEST="$REPO_ROOT/.git/hooks/post-merge"
-  if [ ! -f "$HOOK_DEST" ]; then
-    cat > "$HOOK_DEST" << 'HOOK'
-#!/bin/bash
-# Auto-syncs Claude config to ~/.claude after git pull
-# Installed by install.sh — do not edit manually
-SCRIPT_DIR="$(git rev-parse --show-toplevel)"
-if git diff-tree --no-commit-id -r --name-only ORIG_HEAD HEAD 2>/dev/null | grep -qE "^(agents|skills|rules)/"; then
-  echo "[claude-config] Changes detected, syncing to ~/.claude..."
-  bash "$SCRIPT_DIR/install.sh"
-fi
-HOOK
-    chmod +x "$HOOK_DEST"
-    echo ""
-    echo "  Auto-sync hook installed. Future git pulls will update ~/.claude automatically."
+# --- Set up daily auto-sync ---
+
+setup_cron() {
+  # Skip if cron entry already exists
+  if crontab -l 2>/dev/null | grep -q "$SYNC_MARKER"; then
+    return
   fi
-fi
+
+  SYNC_CMD="cd $CONFIG_REPO && git pull -q && bash install.sh > /dev/null 2>&1 # $SYNC_MARKER"
+  (crontab -l 2>/dev/null; echo "0 9 * * * $SYNC_CMD") | crontab -
+  echo ""
+  echo "  Daily auto-sync scheduled (cron, 9:00 AM)."
+}
+
+setup_windows_task() {
+  # Skip if task already exists
+  if schtasks /query /tn "$SYNC_MARKER" > /dev/null 2>&1; then
+    return
+  fi
+
+  # Get the full path to git bash
+  GIT_BASH="$(command -v bash 2>/dev/null || echo "C:/Program Files/Git/bin/bash.exe")"
+  SYNC_CMD="cd $CONFIG_REPO && git pull -q && bash install.sh"
+
+  schtasks /create /tn "$SYNC_MARKER" \
+    /tr "\"$GIT_BASH\" -c '$SYNC_CMD'" \
+    /sc daily /st 09:00 /f > /dev/null 2>&1
+
+  echo ""
+  echo "  Daily auto-sync scheduled (Windows Task Scheduler, 9:00 AM)."
+}
+
+# Detect platform and set up scheduled sync
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    setup_windows_task
+    ;;
+  *)
+    setup_cron
+    ;;
+esac
 
 echo ""
 echo "Done. Restart Claude Code for changes to take effect."
