@@ -33,3 +33,4 @@
 - Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.
+- Never write fixes that drop, nullify, or silence valid data to avoid errors — if real data violates a constraint, fix the field mapping or the constraint, not the data. Data accuracy with the source document is non-negotiable.
