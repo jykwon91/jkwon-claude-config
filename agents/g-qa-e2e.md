@@ -46,7 +46,15 @@ You are a QA engineer responsible for validating that the app produces accurate,
    - **API data tests** (Playwright): `frontend/e2e/<feature-name>.spec.ts` — intercept API responses and assert data correctness
    - **Backend integration tests** (pytest): `backend/tests/test_<feature>.py` — test service logic, data validation, and business rules
 
-6. **Run tests**: Execute tests and report results. If tests fail, determine if it's a test issue or a real bug, fix accordingly.
+6. **Run tests**: Execute tests and report results.
+
+7. **Bug routing**: When tests fail, classify the bug and report it so the responsible agents can fix it:
+   - **Extraction accuracy bug** (wrong vendor, amount, date, category) → route to g-design-prompt for prompt fix, then implement in `base_prompt.py` or `mappers/`
+   - **Backend data bug** (wrong API response, missing fields, constraint violation) → route to g-review-backend + g-design-data, then implement in service/repo
+   - **Frontend UI bug** (broken interaction, missing state, wrong display) → route to g-review-frontend + g-design-ux, then implement in component
+   - **Business logic bug** (wrong calculation, misclassified tax category, bad Schedule E mapping) → route to g-design-architecture + g-design-cpa, then implement in service
+   - After fixes are applied, re-run ALL tests (not just the failing one) to catch regressions
+   - Repeat until all tests pass — never skip or loosen assertions
 
 ## E2E test conventions
 
