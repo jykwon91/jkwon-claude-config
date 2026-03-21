@@ -1,5 +1,6 @@
 #!/bin/bash
 # Removes Claude shared config installed by this repo from ~/.claude
+# Only removes files tracked in the manifest (won't touch personal config)
 # Also removes: post-merge hooks, daily sync job, and hidden config repo clone
 # Works from both the config repo and project repos
 # Works on Windows (Git Bash), macOS, and Linux
@@ -9,78 +10,101 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$HOME/.claude"
 CONFIG_REPO="$DEST/.config-repo"
+MANIFEST="$DEST/.managed-files"
 SYNC_MARKER="claude-config-sync"
 REMOVED=0
-
-# Detect source directories — config repo uses agents/, project repos use .claude/agents/
-if [ -d "$SCRIPT_DIR/agents" ]; then
-  AGENTS_SRC="$SCRIPT_DIR/agents"
-elif [ -d "$SCRIPT_DIR/.claude/agents" ]; then
-  AGENTS_SRC="$SCRIPT_DIR/.claude/agents"
-elif [ -d "$CONFIG_REPO/agents" ]; then
-  AGENTS_SRC="$CONFIG_REPO/agents"
-else
-  AGENTS_SRC=""
-fi
-
-if [ -d "$SCRIPT_DIR/skills" ]; then
-  SKILLS_SRC="$SCRIPT_DIR/skills"
-elif [ -d "$SCRIPT_DIR/.claude/skills" ]; then
-  SKILLS_SRC="$SCRIPT_DIR/.claude/skills"
-elif [ -d "$CONFIG_REPO/skills" ]; then
-  SKILLS_SRC="$CONFIG_REPO/skills"
-else
-  SKILLS_SRC=""
-fi
-
-if [ -d "$SCRIPT_DIR/rules" ]; then
-  RULES_SRC="$SCRIPT_DIR/rules"
-elif [ -d "$CONFIG_REPO/rules" ]; then
-  RULES_SRC="$CONFIG_REPO/rules"
-else
-  RULES_SRC=""
-fi
 
 echo "Removing Claude shared config from $DEST..."
 echo ""
 
-# --- Remove agents ---
-if [ -n "$AGENTS_SRC" ] && [ -d "$DEST/agents" ]; then
-  for agent in "$AGENTS_SRC/"*.md; do
-    [ -f "$agent" ] || continue
-    name=$(basename "$agent")
-    if [ -f "$DEST/agents/$name" ]; then
-      rm "$DEST/agents/$name"
-      echo "  Removed agent: $name"
+# --- Remove files tracked in the manifest ---
+if [ -f "$MANIFEST" ]; then
+  while IFS= read -r rel_path; do
+    [ -z "$rel_path" ] && continue
+    full_path="$DEST/$rel_path"
+    if [ -f "$full_path" ]; then
+      rm "$full_path"
+      echo "  Removed: $rel_path"
       REMOVED=$((REMOVED + 1))
     fi
-  done
-fi
+  done < "$MANIFEST"
 
-# --- Remove skills ---
-if [ -n "$SKILLS_SRC" ] && [ -d "$DEST/skills" ]; then
-  for skill_dir in "$SKILLS_SRC"/*/; do
-    [ -d "$skill_dir" ] || continue
-    skill_name=$(basename "$skill_dir")
-    if [ -d "$DEST/skills/$skill_name" ]; then
-      rm -rf "$DEST/skills/$skill_name"
-      echo "  Removed skill: $skill_name"
-      REMOVED=$((REMOVED + 1))
-    fi
-  done
-fi
+  # Clean up empty skill directories left behind
+  if [ -d "$DEST/skills" ]; then
+    find "$DEST/skills" -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  fi
 
-# --- Remove rules ---
-if [ -n "$RULES_SRC" ] && [ -d "$DEST/rules" ]; then
-  for rule in "$RULES_SRC/"*.md; do
-    [ -f "$rule" ] || continue
-    name=$(basename "$rule")
-    if [ -f "$DEST/rules/$name" ]; then
-      rm "$DEST/rules/$name"
-      echo "  Removed rule: $name"
-      REMOVED=$((REMOVED + 1))
-    fi
-  done
+  rm "$MANIFEST"
+  echo "  Removed manifest"
+else
+  echo "  No manifest found — falling back to name-based matching."
+  echo ""
+
+  # Fallback: match by name against source directories (for installs before manifest existed)
+  # Detect source directories
+  if [ -d "$SCRIPT_DIR/agents" ]; then
+    AGENTS_SRC="$SCRIPT_DIR/agents"
+  elif [ -d "$SCRIPT_DIR/.claude/agents" ]; then
+    AGENTS_SRC="$SCRIPT_DIR/.claude/agents"
+  elif [ -d "$CONFIG_REPO/agents" ]; then
+    AGENTS_SRC="$CONFIG_REPO/agents"
+  else
+    AGENTS_SRC=""
+  fi
+
+  if [ -d "$SCRIPT_DIR/skills" ]; then
+    SKILLS_SRC="$SCRIPT_DIR/skills"
+  elif [ -d "$SCRIPT_DIR/.claude/skills" ]; then
+    SKILLS_SRC="$SCRIPT_DIR/.claude/skills"
+  elif [ -d "$CONFIG_REPO/skills" ]; then
+    SKILLS_SRC="$CONFIG_REPO/skills"
+  else
+    SKILLS_SRC=""
+  fi
+
+  if [ -d "$SCRIPT_DIR/rules" ]; then
+    RULES_SRC="$SCRIPT_DIR/rules"
+  elif [ -d "$CONFIG_REPO/rules" ]; then
+    RULES_SRC="$CONFIG_REPO/rules"
+  else
+    RULES_SRC=""
+  fi
+
+  if [ -n "$AGENTS_SRC" ] && [ -d "$DEST/agents" ]; then
+    for agent in "$AGENTS_SRC/"*.md; do
+      [ -f "$agent" ] || continue
+      name=$(basename "$agent")
+      if [ -f "$DEST/agents/$name" ]; then
+        rm "$DEST/agents/$name"
+        echo "  Removed agent: $name"
+        REMOVED=$((REMOVED + 1))
+      fi
+    done
+  fi
+
+  if [ -n "$SKILLS_SRC" ] && [ -d "$DEST/skills" ]; then
+    for skill_dir in "$SKILLS_SRC"/*/; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      if [ -d "$DEST/skills/$skill_name" ]; then
+        rm -rf "$DEST/skills/$skill_name"
+        echo "  Removed skill: $skill_name"
+        REMOVED=$((REMOVED + 1))
+      fi
+    done
+  fi
+
+  if [ -n "$RULES_SRC" ] && [ -d "$DEST/rules" ]; then
+    for rule in "$RULES_SRC/"*.md; do
+      [ -f "$rule" ] || continue
+      name=$(basename "$rule")
+      if [ -f "$DEST/rules/$name" ]; then
+        rm "$DEST/rules/$name"
+        echo "  Removed rule: $name"
+        REMOVED=$((REMOVED + 1))
+      fi
+    done
+  fi
 fi
 
 # --- Remove post-merge hook ---
@@ -126,13 +150,11 @@ if [ -d "$CONFIG_REPO" ]; then
       # Schedule deletion after this script exits.
       case "$(uname -s)" in
         MINGW*|MSYS*|CYGWIN*)
-          # Use cmd /c start to delete after this process exits
           cmd //c "start /min cmd /c \"timeout /t 2 /nobreak >nul & rmdir /s /q \"${CONFIG_REPO//\//\\}\"\"" 2>/dev/null
           echo "  Config repo clone will be removed shortly: $CONFIG_REPO"
           REMOVED=$((REMOVED + 1))
           ;;
         *)
-          # Unix: safe to delete while running — file handles keep working
           rm -rf "$CONFIG_REPO"
           echo "  Removed config repo clone: $CONFIG_REPO"
           REMOVED=$((REMOVED + 1))
