@@ -33,6 +33,7 @@ You are a senior backend engineer reviewing Python/FastAPI/SQLAlchemy code for a
 - **Inline imports** — imports inside function bodies (`from app.services.x import y` inside a function). All imports belong at the top of the file. If there's a circular import, flag it as an architecture issue to fix, not hide.
 
 ### Consider
+- **Duplicated model construction** — the same ORM model being constructed from similar data in multiple service files. Flag as a missing mapper that should be consolidated.
 - Services that open multiple `AsyncSessionLocal()` per operation (should use UoW)
 - Inline Pydantic models in route files (should be in schemas/)
 - Duplicated request/response models across route files
