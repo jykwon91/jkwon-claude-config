@@ -25,7 +25,7 @@
 - Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
 - Always validate field names against an explicit allowlist before applying dynamic updates (`setattr`, spread operators, etc.).
 - Use toast banners for error and success feedback — never use `alert()` or modal dialogs for operation results.
-- Use skeleton loaders for page loading states — never show plain text like "Loading..." as a placeholder.
+- Use skeleton loaders for page loading states — never show plain text like "Loading..." as a placeholder. Skeletons must mirror the exact layout of the loaded page (same grid columns, same number of sections, same element count) to prevent layout shift.
 - Always show a loading state on buttons immediately when clicked — don't wait for the API response to indicate progress.
 - Never block the UI or API responsiveness with background work — offload long-running tasks so users can continue interacting with the application.
 - Always provide visible feedback for every user action — show progress during operations, confirm success on completion, and display clear error messages on failure. Never leave the user wondering if something happened.
