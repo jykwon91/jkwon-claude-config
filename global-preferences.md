@@ -34,3 +34,5 @@
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.
 - Never refactor or rewrite components without preserving all existing functionality — inventory current features before rewriting, verify each feature works after, and get explicit confirmation before removing any feature.
+- Always inspect actual data before fixing bugs — query the database, check API responses, examine extraction output. Never assume what the data looks like. If a constraint violation occurs, examine the failing row values. If a field is null, check what the source system actually returns. The fix is almost always a mapping issue, not a constraint or data issue.
+- Never write fixes that drop, nullify, or silence valid data to avoid errors — if real data violates a constraint, fix the field mapping or the constraint, not the data. Data accuracy with the source document is non-negotiable.
