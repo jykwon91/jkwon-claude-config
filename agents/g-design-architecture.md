@@ -33,6 +33,7 @@ Before recommending a custom implementation, research whether a well-supported, 
 - Each module, file, or function has a single, well-defined purpose
 - Business logic does not leak into route handlers, UI components, or database queries
 - Cross-cutting concerns (auth, logging, validation) are handled via middleware or decorators, not duplicated
+- Data mapping/conversion logic belongs in dedicated mapper modules, not in services. Services orchestrate (load, decide, persist); mappers convert (raw data → model). If the same model is being constructed from similar data in more than one service file, flag it as duplicated mapper logic that needs consolidation.
 
 ### Modularity
 - Prefer more files over large files — if a file is growing, break it down by responsibility
@@ -40,6 +41,7 @@ Before recommending a custom implementation, research whether a well-supported, 
 - Group files by feature or domain, not by file type
 - Extract shared logic into dedicated modules rather than duplicating
 - Constants, configuration, and type definitions live in dedicated directories
+- When a flat directory exceeds ~15 files, organize into domain subdirectories with `__init__.py` facades
 
 ### Strict typing
 - Everything is strictly typed — no `any`, no implicit types, no loose definitions
