@@ -83,6 +83,7 @@ If a contradiction is found in step 5:
 - There can be at most **two** open PRs at a time: one `[objective - no discussion required]` and one `[subjective - discussion required]`.
 - Never mix objective and subjective preferences in the same PR.
 - Always check `gh pr list --state open` before creating a new PR.
+- **Before pushing to any branch, verify the PR is still open:** run `gh pr view <branch> --json state` — if the state is `MERGED` or `CLOSED`, do NOT push. Instead, checkout main, pull, create a new branch, and open a new PR. Pushing to a merged PR's branch is silently lost.
 - Always pull the branch before committing to avoid overwriting another user's changes.
 - **TODO:** For `[subjective - discussion required]` PRs, add a policy requiring team members to leave a comment signifying discussion and agreement before merging. Define what constitutes sufficient agreement (e.g., all team members comment, majority approve, etc.).
 
