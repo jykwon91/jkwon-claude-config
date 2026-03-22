@@ -6,12 +6,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo is the shared Claude Code configuration for all projects. It contains global agents, skills, rules, and preferences. Changes here are automatically synced to registered project repos via GitHub Action, and to developer machines via `install.sh` or the `post-merge` hook set up by `onboard.sh`.
 
+## Ownership
+
+The following files are owned by @jykwon91 and must not be modified by automated processes (auto-capture, agents, scripts) or other contributors without explicit approval:
+
+- `CLAUDE.md` — repo rules and structure
+- `global-preferences.md` — universal engineering preferences
+- `install.sh`, `onboard.sh`, `uninstall.sh` — installation scripts
+- `stacks.md` — stack profiles and discovery questions
+- `projects.txt` — registered project registry
+
+**Files that CAN be modified via automated PRs** (e.g., auto-capture from technical users):
+- `stacks/*.md` — stack-specific guides (react.md, python.md, etc.)
+
+When creating automated PRs to `stacks/*.md`, always tag @jykwon91 as reviewer.
+
+## Workflow
+
+- Never push directly to main — always create a feature branch and open a PR, even for single-file changes.
+- Always check if a PR has been merged before pushing additional commits to a branch.
+- Branch naming: `feature/<name>`, `fix/<name>`, `stack/<name>` (for stack guide updates).
+
 ## Structure
 
 - `agents/` — Global subagent definitions (copied to `~/.claude/agents/`)
 - `skills/` — Global slash command skills (copied to `~/.claude/skills/`)
-- `rules/` — Global rules (copied to `~/.claude/rules/`)
-- `global-preferences.md` — Engineering preferences injected into each project's `CLAUDE.md`
+- `rules/` — Global rules, auto-loaded for all projects (copied to `~/.claude/rules/`)
+- `stacks/` — Stack-specific guides (react.md, python.md, fastapi.md) loaded conditionally by agents (copied to `~/.claude/stacks/`)
+- `stacks.md` — Discovery questions and stack profiles for greenfield projects
+- `global-preferences.md` — Universal engineering preferences injected into each project's `CLAUDE.md`
 - `hooks/post-merge` — Git hook template that auto-syncs `~/.claude/` on `git pull`
 - `onboard.sh` — One-time developer setup (installs the post-merge hook in a project repo)
 - `install.sh` — Direct install of agents/skills/rules to `~/.claude/`
