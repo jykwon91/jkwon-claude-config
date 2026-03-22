@@ -29,6 +29,7 @@
 ### Testing
 - Always write unit tests alongside new code — strive for high coverage to protect against regressions and breaking changes.
 - E2E tests are regression contracts — when a test fails, the code is broken, not the test. Fix the code to make the test pass. Never change a test just to satisfy broken code. Only update tests when feature requirements explicitly change.
+- Always include E2E layout tests when adding new pages or modifying page layouts.
 
 ### Security
 - Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
