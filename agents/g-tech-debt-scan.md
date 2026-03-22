@@ -1,5 +1,5 @@
 ---
-name: g-audit-project
+name: g-tech-debt-scan
 description: Performs a full-project audit across data design, software architecture, UX, and security. Outputs a prioritized improvement plan to TECH_DEBT.md. Re-running removes fixed issues and surfaces new ones. Use to assess project health or decide what to work on next.
 tools: Read, Grep, Glob, Bash
 model: opus
