@@ -77,6 +77,21 @@ model: sonnet
 - **Bug routing is specific**: Not "report bugs to be fixed" but "extraction amount wrong → g-design-prompt reviews base_prompt.py, then mapper."
 - **Includes code examples**: Data validation patterns with actual API endpoints, field names, and assertion helpers from THIS project.
 
+## Critical rule: tests are regression contracts
+
+E2E tests define how features should work. When a test fails:
+1. The CODE is broken, not the test
+2. Fix the code to make the test pass
+3. NEVER change a test just to satisfy broken code
+4. A test failure after a merge/rebase = regression = features were lost
+
+Only update tests when:
+- Feature requirements explicitly change (user agrees on new behavior)
+- A new feature is added (new tests needed)
+- The test itself has a selector bug (wrong locator, not wrong assertion)
+
+The generated QA agent MUST include this rule prominently. It is non-negotiable.
+
 ## When to re-run this agent
 
 - Project adds a new major feature domain (e.g., bookkeeping app adds inventory management)
