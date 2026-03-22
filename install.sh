@@ -1,7 +1,7 @@
 #!/bin/bash
-# Installs shared Claude agents, skills, and rules to ~/.claude
-# Clones the config repo if needed and sets up daily auto-sync
-# Tracks installed files in a manifest to avoid overwriting personal config
+# Installs shared Claude agents, skills, rules, and stacks to ~/.claude
+# Uses symlinks so changes to the config repo are immediately reflected
+# Clones the config repo if needed and sets up auto-sync
 # Works on Windows (Git Bash), macOS, and Linux
 
 set -e
@@ -9,9 +9,7 @@ set -e
 REPO_URL="https://github.com/jykwon91/jkwon-claude-config.git"
 DEST="$HOME/.claude"
 CONFIG_REPO="$DEST/.config-repo"
-MANIFEST="$DEST/.managed-files"
 SYNC_MARKER="claude-config-sync"
-SKIPPED=0
 
 # If run from a local clone, use that as the source
 # Otherwise, clone/pull the repo into ~/.claude/.config-repo
@@ -31,103 +29,89 @@ fi
 echo "Installing Claude shared config to $DEST..."
 echo ""
 
-# Create destination directories
-mkdir -p "$DEST/agents" "$DEST/skills" "$DEST/rules" "$DEST/stacks"
+# Symlink directories: agents, rules, stacks
+# These are fully managed by the config repo — symlink the entire directory
+for dir in agents rules stacks; do
+  src="$SCRIPT_DIR/$dir"
+  dest="$DEST/$dir"
 
-# Load existing manifest into a set for fast lookup
-declare -A MANAGED
-if [ -f "$MANIFEST" ]; then
-  while IFS= read -r line; do
-    MANAGED["$line"]=1
-  done < "$MANIFEST"
-fi
+  [ -d "$src" ] || continue
 
-# Track newly installed files
-NEW_MANIFEST=()
-
-# Helper: install a file if safe to do so
-install_file() {
-  local src="$1"
-  local dest="$2"
-  local label="$3"
-  local rel_dest="${dest#$DEST/}"
-
-  if [ -f "$dest" ] && [ -z "${MANAGED[$rel_dest]}" ]; then
-    echo "  SKIPPED $label (personal file exists — not overwriting)"
-    SKIPPED=$((SKIPPED + 1))
-    return
+  # If dest is already a symlink pointing to the right place, skip
+  if [ -L "$dest" ]; then
+    current_target="$(readlink "$dest")"
+    if [ "$current_target" = "$src" ]; then
+      echo "  $dir/ — symlink OK"
+      continue
+    fi
+    # Wrong target — remove and re-link
+    rm "$dest"
+  elif [ -d "$dest" ]; then
+    # Real directory exists — back it up, then replace with symlink
+    echo "  Backing up existing $dir/ to ${dir}.bak/"
+    rm -rf "$DEST/${dir}.bak"
+    mv "$dest" "$DEST/${dir}.bak"
   fi
 
-  cp "$src" "$dest"
-  NEW_MANIFEST+=("$rel_dest")
-  echo "  Installed: $label"
-}
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      win_src="$(cygpath -w "$src")"
+      win_dest="$(cygpath -w "$dest")"
+      powershell -Command "New-Item -ItemType Junction -Path '$win_dest' -Target '$win_src'" > /dev/null 2>&1 || {
+        echo "  WARNING: junction failed for $dir/. Falling back to copy."
+        cp -r "$src" "$dest"
+      }
+      ;;
+    *)
+      ln -s "$src" "$dest"
+      ;;
+  esac
+  echo "  Symlinked: $dir/ → $src"
+done
 
-# Helper: install a directory (for skills)
-install_skill_dir() {
-  local src_dir="$1"
-  local skill_name="$2"
-  local dest_dir="$DEST/skills/$skill_name"
-  local rel_dest="skills/$skill_name/SKILL.md"
-
-  if [ -f "$dest_dir/SKILL.md" ] && [ -z "${MANAGED[$rel_dest]}" ]; then
-    echo "  SKIPPED skill: $skill_name (personal skill exists — not overwriting)"
-    SKIPPED=$((SKIPPED + 1))
-    return
-  fi
-
-  mkdir -p "$dest_dir"
-  cp "$src_dir/SKILL.md" "$dest_dir/SKILL.md"
-  NEW_MANIFEST+=("$rel_dest")
-  echo "  Installed: skill/$skill_name"
-}
-
-# Install agents
-if [ -d "$SCRIPT_DIR/agents" ]; then
-  for agent in "$SCRIPT_DIR/agents/"*.md; do
-    [ -f "$agent" ] || continue
-    name=$(basename "$agent")
-    install_file "$agent" "$DEST/agents/$name" "agent/$name"
-  done
-fi
-
-# Install skills
+# Skills need special handling: each skill is a subdirectory
+# Symlink individual skill directories so personal skills coexist
+mkdir -p "$DEST/skills"
 if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_dir in "$SCRIPT_DIR/skills"/*/; do
     [ -d "$skill_dir" ] || continue
     skill_name=$(basename "$skill_dir")
-    install_skill_dir "$skill_dir" "$skill_name"
+    dest_skill="$DEST/skills/$skill_name"
+
+    if [ -L "$dest_skill" ]; then
+      current_target="$(readlink "$dest_skill")"
+      if [ "$current_target" = "$skill_dir" ] || [ "$current_target" = "${skill_dir%/}" ]; then
+        echo "  skill/$skill_name — symlink OK"
+        continue
+      fi
+      rm "$dest_skill"
+    elif [ -d "$dest_skill" ]; then
+      rm -rf "$dest_skill"
+    fi
+
+    case "$(uname -s)" in
+      MINGW*|MSYS*|CYGWIN*)
+        win_src="$(cygpath -w "${skill_dir%/}")"
+        win_dest="$(cygpath -w "$dest_skill")"
+        powershell -Command "New-Item -ItemType Junction -Path '$win_dest' -Target '$win_src'" > /dev/null 2>&1 || {
+          echo "  WARNING: junction failed for skill/$skill_name. Falling back to copy."
+          cp -r "${skill_dir%/}" "$dest_skill"
+        }
+        ;;
+      *)
+        ln -s "${skill_dir%/}" "$dest_skill"
+        ;;
+    esac
+    echo "  Symlinked: skill/$skill_name"
   done
 fi
 
-# Install rules
-if [ -d "$SCRIPT_DIR/rules" ]; then
-  for rule in "$SCRIPT_DIR/rules/"*.md; do
-    [ -f "$rule" ] || continue
-    name=$(basename "$rule")
-    install_file "$rule" "$DEST/rules/$name" "rule/$name"
-  done
-fi
+# Clean up old manifest file (no longer needed with symlinks)
+rm -f "$DEST/.managed-files"
 
-# Install stack guides
-if [ -d "$SCRIPT_DIR/stacks" ]; then
-  for stack in "$SCRIPT_DIR/stacks/"*.md; do
-    [ -f "$stack" ] || continue
-    name=$(basename "$stack")
-    install_file "$stack" "$DEST/stacks/$name" "stack/$name"
-  done
-fi
-
-# Write updated manifest
-printf '%s\n' "${NEW_MANIFEST[@]}" > "$MANIFEST"
-
-if [ "$SKIPPED" -gt 0 ]; then
-  echo ""
-  echo "  $SKIPPED file(s) skipped to protect personal config."
-  echo "  To force overwrite, delete the personal file and re-run install.sh."
-fi
-
-# --- Set up daily auto-sync ---
+# --- Set up auto-sync ---
+# The scheduled task just pulls the config repo.
+# With symlinks, that's all that's needed — no install step required.
 
 setup_cron() {
   # Skip if cron entry already exists
@@ -135,7 +119,7 @@ setup_cron() {
     return
   fi
 
-  SYNC_CMD="cd $CONFIG_REPO && git pull -q && bash install.sh > /dev/null 2>&1 # $SYNC_MARKER"
+  SYNC_CMD="cd $SCRIPT_DIR && git pull -q 2>/dev/null # $SYNC_MARKER"
   (crontab -l 2>/dev/null; echo "0 9 * * * $SYNC_CMD") | crontab -
   echo ""
   echo "  Daily auto-sync scheduled (cron, 9:00 AM)."
@@ -147,9 +131,8 @@ setup_windows_task() {
     return
   fi
 
-  # Get the full path to git bash
   GIT_BASH="$(command -v bash 2>/dev/null || echo "C:/Program Files/Git/bin/bash.exe")"
-  SYNC_CMD="cd $CONFIG_REPO && git pull -q && bash install.sh"
+  SYNC_CMD="cd $SCRIPT_DIR && git pull -q"
 
   schtasks /create /tn "$SYNC_MARKER" \
     /tr "\"$GIT_BASH\" -c '$SYNC_CMD'" \
@@ -159,7 +142,6 @@ setup_windows_task() {
   echo "  Daily auto-sync scheduled (Windows Task Scheduler, 9:00 AM)."
 }
 
-# Detect platform and set up scheduled sync
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     setup_windows_task
@@ -169,11 +151,49 @@ case "$(uname -s)" in
     ;;
 esac
 
+# --- Set up global git hook for pull-time sync ---
+# After any git pull on any repo, also pull the config repo
+setup_global_git_hook() {
+  local hooks_dir="$HOME/.config/git/hooks"
+  local hook_file="$hooks_dir/post-merge"
+  local hook_marker="# claude-config-auto-sync"
+
+  mkdir -p "$hooks_dir"
+
+  # Set global hooksPath if not already set
+  current_hooks="$(git config --global core.hooksPath 2>/dev/null || true)"
+  if [ -z "$current_hooks" ]; then
+    git config --global core.hooksPath "$hooks_dir"
+  fi
+
+  # Skip if hook already has our sync line
+  if [ -f "$hook_file" ] && grep -q "$hook_marker" "$hook_file"; then
+    echo "  Global post-merge hook — already configured"
+    return
+  fi
+
+  # Append our sync to the hook (preserving any existing content)
+  if [ ! -f "$hook_file" ]; then
+    echo "#!/bin/bash" > "$hook_file"
+  fi
+
+  cat >> "$hook_file" << 'HOOK'
+
+# claude-config-auto-sync
+# Pull the shared Claude config repo after any git pull
+(cd "$HOME/Documents/Git/jkwon-claude-config" 2>/dev/null && git pull -q 2>/dev/null &)
+HOOK
+
+  chmod +x "$hook_file"
+  echo "  Global post-merge hook installed — config repo syncs on every git pull"
+}
+
+setup_global_git_hook
+
 echo ""
 echo "Done. Restart Claude Code for changes to take effect."
 echo ""
-echo "To verify, check that these directories have files:"
-echo "  ls ~/.claude/agents/"
-echo "  ls ~/.claude/skills/"
-echo "  ls ~/.claude/rules/"
-echo "  ls ~/.claude/stacks/"
+echo "Sync mechanism:"
+echo "  - Symlinks: changes to the config repo are reflected immediately"
+echo "  - Daily scheduled task: pulls the config repo at 9:00 AM"
+echo "  - Global git hook: pulls the config repo after any git pull"
