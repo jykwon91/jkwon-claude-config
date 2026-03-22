@@ -9,7 +9,6 @@ set -e
 REPO_URL="https://github.com/jykwon91/jkwon-claude-config.git"
 DEST="$HOME/.claude"
 CONFIG_REPO="$DEST/.config-repo"
-SYNC_MARKER="claude-config-sync"
 
 # If run from a local clone, use that as the source
 # Otherwise, clone/pull the repo into ~/.claude/.config-repo
@@ -109,48 +108,6 @@ fi
 # Clean up old manifest file (no longer needed with symlinks)
 rm -f "$DEST/.managed-files"
 
-# --- Set up auto-sync ---
-# The scheduled task just pulls the config repo.
-# With symlinks, that's all that's needed — no install step required.
-
-setup_cron() {
-  # Skip if cron entry already exists
-  if crontab -l 2>/dev/null | grep -q "$SYNC_MARKER"; then
-    return
-  fi
-
-  SYNC_CMD="cd $SCRIPT_DIR && git pull -q 2>/dev/null # $SYNC_MARKER"
-  (crontab -l 2>/dev/null; echo "0 9 * * * $SYNC_CMD") | crontab -
-  echo ""
-  echo "  Daily auto-sync scheduled (cron, 9:00 AM)."
-}
-
-setup_windows_task() {
-  # Skip if task already exists
-  if schtasks /query /tn "$SYNC_MARKER" > /dev/null 2>&1; then
-    return
-  fi
-
-  GIT_BASH="$(command -v bash 2>/dev/null || echo "C:/Program Files/Git/bin/bash.exe")"
-  SYNC_CMD="cd $SCRIPT_DIR && git pull -q"
-
-  schtasks /create /tn "$SYNC_MARKER" \
-    /tr "\"$GIT_BASH\" -c '$SYNC_CMD'" \
-    /sc daily /st 09:00 /f > /dev/null 2>&1
-
-  echo ""
-  echo "  Daily auto-sync scheduled (Windows Task Scheduler, 9:00 AM)."
-}
-
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    setup_windows_task
-    ;;
-  *)
-    setup_cron
-    ;;
-esac
-
 # --- Set up global git hook for pull-time sync ---
 # After any git pull on any repo, also pull the config repo
 setup_global_git_hook() {
@@ -194,6 +151,5 @@ echo ""
 echo "Done. Restart Claude Code for changes to take effect."
 echo ""
 echo "Sync mechanism:"
-echo "  - Symlinks: changes to the config repo are reflected immediately"
-echo "  - Daily scheduled task: pulls the config repo at 9:00 AM"
+echo "  - Junctions/symlinks: changes to the config repo are reflected immediately"
 echo "  - Global git hook: pulls the config repo after any git pull"
