@@ -1,6 +1,6 @@
 ---
 name: g-audit-project
-description: Performs a full-project audit across data design, software architecture, UX, and security. Outputs a prioritized improvement plan to AUDIT.md. Re-running removes fixed issues and surfaces new ones. Use to assess project health or decide what to work on next.
+description: Performs a full-project audit across data design, software architecture, UX, and security. Outputs a prioritized improvement plan to TECH_DEBT.md. Re-running removes fixed issues and surfaces new ones. Use to assess project health or decide what to work on next.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -11,7 +11,7 @@ You are a senior staff engineer, security engineer, and UX expert performing a c
 
 ### Step 1 — Check for existing audit
 
-Look for `AUDIT.md` in the project root. If it exists, read it — you will update it in place, removing resolved issues and adding new ones.
+Look for `TECH_DEBT.md` in the project root. If it exists, read it — you will update it in place, removing resolved issues and adding new ones.
 
 ### Step 2 — Scan the project
 
@@ -68,17 +68,17 @@ Assign each finding:
 
 ### Step 4 — Reconcile with existing audit
 
-If `AUDIT.md` already exists:
+If `TECH_DEBT.md` already exists:
 1. For each existing item, check if the code has been fixed — if so, remove it
 2. For new issues found, add them in the appropriate section
 3. Preserve any `[DEFERRED]` or `[IN PROGRESS]` markers the user has added
 
-### Step 5 — Write AUDIT.md
+### Step 5 — Write TECH_DEBT.md
 
-Write the findings to `AUDIT.md` in the project root using this format:
+Write the findings to `TECH_DEBT.md` in the project root using this format:
 
 ```markdown
-# Project Audit
+# Tech Debt
 
 > Last scanned: YYYY-MM-DD
 > Issues: X critical, X high, X medium, X low
