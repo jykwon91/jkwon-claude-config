@@ -146,12 +146,12 @@ Detect the project's test runners, linters, and build tools from config files (`
 - If not running, report as blocker — do NOT attempt to start servers
 
 **Stage 4 — E2E tests (if they exist):**
-- Run the full E2E suite
-- Parse failures, group by root cause, fix the root cause that unblocks the most tests first
-- For each fix: read the test → read the app code → compare expected vs actual → fix the app code
-- Re-run only previously failing tests after each fix
-- After all individual fixes pass, run the full suite for regression check
-- Loop until all E2E tests pass (max 5 iterations per failure)
+- Run the full E2E suite with JSON reporter, parse failures into structured list
+- Group failures by root cause
+- For each root cause: read the test + app code, launch `g-diagnose-e2e` for ranked hypotheses, launch `g-fix-e2e` to apply fix #1
+- Re-run failing tests after each fix. If still fails, try fix #2 via `g-fix-e2e`
+- After all fixes, full regression run. If new failures, repeat
+- Max 3 fix attempts per failure, max 3 regression loops
 
 **Stage 5 — Inline code review:**
 - Review all files changed during this pipeline (`git diff --name-only HEAD`)

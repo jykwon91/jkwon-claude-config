@@ -70,18 +70,26 @@ If servers are down:
 
 ### Stage 4: E2E Tests + Fix Loop (if E2E tests exist)
 
-Run the full E2E suite. Parse failures, group by root cause, fix the root cause that unblocks the most tests first.
+**You run the tests and parse failures. `g-diagnose-e2e` diagnoses. `g-fix-e2e` edits. You verify.**
 
-For each root cause:
-1. Read the failing test — understand the user flow
-2. Read the application code it exercises
-3. Compare expected vs actual behavior
-4. State the root cause before fixing
-5. Apply the minimal fix
+**4a. Run the full E2E suite** using JSON reporter and parse failures into a structured list of: test name, file, line, error message.
 
-Re-run only previously failing tests after each fix. After all fixes pass, run the full suite for regression check.
+**4b. If all pass** → advance to Stage 5.
 
-**Safety valve:** Max 5 attempts per individual failure.
+**4c. Group failures by root cause.** Multiple tests often fail for the same reason.
+
+**4d. For each root cause:**
+1. Read the failing test file and the app code it exercises
+2. Launch `g-diagnose-e2e` with: test name, error message, and the file contents you read
+3. Get back ranked fix hypotheses (exact OLD/NEW edits)
+4. Launch `g-fix-e2e` with the diagnosis — it applies fix #1
+5. Re-run the failing test(s)
+6. If still fails → send `g-fix-e2e` "didn't work, try fix #2"
+7. If all 3 hypotheses exhausted → log to TECH_DEBT.md, move to next failure
+
+**4e. After all failures addressed**, full regression run. If new failures → repeat from 4a.
+
+**Safety valve:** Max 3 fix attempts per failure. Max 3 full regression loops.
 
 ---
 
