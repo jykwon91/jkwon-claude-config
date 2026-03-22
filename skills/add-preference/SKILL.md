@@ -16,12 +16,12 @@ The user wants to propose a new global preference to the shared Claude Code conf
 6. **Route based on classification:**
 
    **If objective:** Confirm the statement with the user, then push to the global config.
-   - Check for an existing open **objective** PR (title contains `[objective change]`). If one exists, check out that branch, pull latest, and add the preference there.
-   - If no objective PR exists, create a new branch `preference/<short-slug>` and open a PR with `[objective change]` in the title.
+   - Check for an existing open **objective** PR (title contains `[objective - no discussion required]`). If one exists, check out that branch, pull latest, and add the preference there.
+   - If no objective PR exists, create a new branch `preference/<short-slug>` and open a PR with `[objective - no discussion required]` in the title.
 
    **If subjective:** Explain to the user casually, something like: "This one's more of a personal preference — not every developer would agree on it. I can add it to this project's config so it applies here. Or if you think it should apply across all your projects, I can put it up for review so other developers on the team can weigh in before it becomes a standard. What would you like to do?"
    - If the user chooses **local**: add it to the project's CLAUDE.md.
-   - If the user chooses **global review**: push to a separate PR with `[subjective change]` in the title so it's clear this needs team input before merging. Never combine these with the objective PR.
+   - If the user chooses **global review**: push to a separate PR with `[subjective - discussion required]` in the title so it's clear this needs team input before merging. Never combine these with the objective PR.
 
 7. In `~/Documents/Git/jkwon-claude-config` (if pushing to global):
    - **Always pull before editing:** Run `git pull` on the branch before making changes to avoid overwriting another user's work.
@@ -39,9 +39,9 @@ When pushing to an existing PR, the title and body become stale (they only descr
 
 1. Get the commit log for the branch: `git log main..HEAD --oneline`
 2. **Update the PR title** to summarize all changes:
-   - If 1 commit: use that commit message as the title (with the `[objective change]` or `[subjective change]` tag)
-   - If 2-3 commits: use a short summary title like `[objective change] Add 3 preferences: <brief list>`
-   - If 4+ commits: use `[objective change] Config updates (N changes)`
+   - If 1 commit: use that commit message as the title (with the `[objective - no discussion required]` or `[subjective - discussion required]` tag)
+   - If 2-3 commits: use a short summary title like `[objective - no discussion required] Add 3 preferences: <brief list>`
+   - If 4+ commits: use `[objective - no discussion required] Config updates (N changes)`
 3. **Update the PR body** with a bullet list generated from the commit messages:
    ```
    ## Changes
@@ -80,17 +80,18 @@ If a contradiction is found in step 5:
 
 ## PR management
 
-- There can be at most **two** open PRs at a time: one `[objective change]` and one `[subjective change]`.
+- There can be at most **two** open PRs at a time: one `[objective - no discussion required]` and one `[subjective - discussion required]`.
 - Never mix objective and subjective preferences in the same PR.
 - Always check `gh pr list --state open` before creating a new PR.
 - Always pull the branch before committing to avoid overwriting another user's changes.
+- **TODO:** For `[subjective - discussion required]` PRs, add a policy requiring team members to leave a comment signifying discussion and agreement before merging. Define what constitutes sufficient agreement (e.g., all team members comment, majority approve, etc.).
 
 ## Autonomous mode
 
 When working autonomously (no user available to prompt):
-- If 100% certain the preference is objective, push directly to the `[objective change]` PR — no prompt needed.
+- If 100% certain the preference is objective, push directly to the `[objective - no discussion required]` PR — no prompt needed.
 - If there is any doubt at all, add it to the project's local CLAUDE.md silently. Do not create a global PR without certainty.
-- Never create a `[subjective change]` PR autonomously — those require user input by definition.
+- Never create a `[subjective - discussion required]` PR autonomously — those require user input by definition.
 
 ## Style guide for preference statements
 
