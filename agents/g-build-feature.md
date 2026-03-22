@@ -22,6 +22,10 @@ Before anything else, determine what kind of project you're working in.
 - Questions are business questions, not technical ones — the user should never need to know what React or PostgreSQL is
 - Select the appropriate stack profile based on answers
 - Set up the project structure, CLAUDE.md, and initial config before building features
+- **Set the Tech Debt Policy** — add a `## Tech Debt Policy` section to the new CLAUDE.md. Deduce the mode from project maturity signals — never ask the user:
+  - `mode: fix` — project has ALL of: E2E tests, unit tests, CI/pipeline, TECH_DEBT.md with structured entries, and evidence of iterative refinement (issues being resolved over time)
+  - `mode: log-only` — default for everything else. New projects, projects without test suites, projects with large unresolved backlogs (20+ issues), or projects where fixing side issues could destabilize unrelated code
+  - For `log-only` projects, only fix tech debt with Critical severity that directly blocks the current feature
 
 ## Set expectations upfront
 
@@ -121,36 +125,64 @@ Launch test agents:
 
 Detect the project's test framework from config files (jest, vitest, pytest, go test, etc.) — never hardcode test commands.
 
-### Step 5: Run tests and fix bugs (loop until green)
+### Step 5: Full Validation Pipeline (loop until 0 errors)
 
-Detect and run the project's test suite:
-- Look for test scripts in `package.json`, `pyproject.toml`, `Makefile`, or equivalent
-- Run all relevant test suites (unit, integration, E2E)
+Run the complete validation pipeline. This is a gated, staged process — do not advance to the next stage until the current stage passes. Fix the CODE, never the tests. Tests are regression contracts.
 
-If tests fail, diagnose and fix:
-- **Data/logic bug** → fix in service/repository/mapper layer
-- **UI bug** → fix in component/hook/template
-- **Type error** → fix the type definition or implementation
-- **Test environment issue** → fix test setup, not the test assertion
+Detect the project's test runners, linters, and build tools from config files (`package.json`, `pyproject.toml`, `Makefile`, etc.) — never hardcode commands.
 
-**CRITICAL:** Fix the CODE, never the test. Tests are regression contracts. Only update a test if the feature requirements have changed.
+**Stage 1 — Build check:**
+- Run the project's type checker and linter (errors only, ignore warnings)
+- Fix any errors, loop until clean (max 5 iterations per error)
 
-Re-run tests after every fix. Repeat until ALL tests pass.
+**Stage 2 — Unit tests:**
+- Run frontend and backend unit test suites
+- For each failure: read the test, read the app code, fix the app code, re-run
+- After individual fixes, re-run full suites to confirm no regressions
+- Loop until both suites pass (max 5 iterations per failure)
 
-### Step 6: Review
+**Stage 3 — Server check (if E2E tests exist):**
+- Verify frontend and backend servers are running
+- If not running, report as blocker — do NOT attempt to start servers
 
-After all tests pass, launch review agents **in parallel**:
-- `g-review-code` — code quality, logic errors, performance
-- `g-review-frontend` — frontend patterns, accessibility, quality (if frontend was changed)
-- `g-review-backend` — architecture, correctness, security (if backend was changed)
+**Stage 4 — E2E tests (if they exist):**
+- Run the full E2E suite
+- Parse failures, group by root cause, fix the root cause that unblocks the most tests first
+- For each fix: read the test → read the app code → compare expected vs actual → fix the app code
+- Re-run only previously failing tests after each fix
+- After all individual fixes pass, run the full suite for regression check
+- Loop until all E2E tests pass (max 5 iterations per failure)
 
-Fix any issues found by reviewers, then re-run tests to confirm no regressions.
+**Stage 5 — Inline code review:**
+- Review all files changed during this pipeline (`git diff --name-only HEAD`)
+- Must Fix: logic errors, missing await, data loss patterns, security issues, schema mismatches
+- Fix all Must Fix issues, re-run relevant test suites after each fix
+- Note but don't fix: performance concerns, large components, missing annotations
 
-### Step 7: Pre-commit
+**Stage 6 — Final validation:**
+- Re-run all test suites — they must all pass
+- If anything fails, go back to the relevant stage
 
-Run `g-pre-commit` against all changed files. Fix any critical or high-severity findings. Re-run tests if fixes were needed.
+**Stage 7 — Fix existing tech debt (conditional):**
+- Read `## Tech Debt Policy` in `CLAUDE.md`
+- If `mode: fix`: read `TECH_DEBT.md`, pick top N issues by severity (N = `max_fixes_per_run`), fix each, re-run tests, remove fixed issues from `TECH_DEBT.md`. If a fix breaks tests, revert and skip.
+- If `mode: log-only` or no policy exists: skip this stage
 
-### Step 8: Commit
+**Stage 8 — Log new tech debt:**
+- Write all non-blocking issues discovered during THIS run to `TECH_DEBT.md` — mandatory, never skip
+- Log: code review "Note but don't fix" items, unresolved failures that hit the safety valve, pattern issues noticed but out of scope
+- Read `TECH_DEBT.md` first to match the existing format and avoid duplicates
+- Severity: Critical (data loss/security), High (silent failures/wrong data), Medium (dead code/loose typing), Low (style/refactors)
+- Format per issue: `### [Category] Short description` with Effort, Location, Problem, Recommendation
+- Update the issue counts in the header line
+- Do NOT log issues that were fixed during the pipeline
+
+**Safety valves:**
+- Max 5 attempts per individual failure
+- Max 3 full pipeline loops
+- Never modify test files, config files (unless config is the root cause), or infrastructure
+
+### Step 6: Commit
 
 Create a well-structured commit:
 1. Create a feature branch: `git checkout -b feature/<feature-name>`
