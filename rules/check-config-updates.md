@@ -11,16 +11,23 @@ git -C "$HOME/Documents/Git/jkwon-claude-config" fetch -q 2>/dev/null
 git -C "$HOME/Documents/Git/jkwon-claude-config" log HEAD..origin/main --oneline 2>/dev/null
 ```
 
-**If there are pending commits** (the log output is not empty), tell the user:
+**If there are pending commits** (the log output is not empty), also check if junctions are set up:
+
+```bash
+[ -L "$HOME/.claude/agents" ] || powershell -Command "(Get-Item '$HOME\.claude\agents').Attributes -band [IO.FileAttributes]::ReparsePoint" 2>/dev/null
+```
+
+Then tell the user:
 
 > Your global Claude config has pending updates:
 > - <commit message 1>
 > - <commit message 2>
 >
 > Run `cd ~/Documents/Git/jkwon-claude-config && git pull` to update.
->
-> If this is a new machine or junctions aren't set up yet, run:
-> `bash ~/Documents/Git/jkwon-claude-config/install.sh`
+
+If junctions are NOT set up (the check above returns false/empty), also add:
+
+> First-time setup detected. Run `bash ~/Documents/Git/jkwon-claude-config/install.sh` to set up automatic syncing.
 
 **If no pending commits**, say nothing. Don't mention that you checked.
 
