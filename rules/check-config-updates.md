@@ -18,6 +18,9 @@ git -C "$HOME/Documents/Git/jkwon-claude-config" log HEAD..origin/main --oneline
 > - <commit message 2>
 >
 > Run `cd ~/Documents/Git/jkwon-claude-config && git pull` to update.
+>
+> If this is a new machine or junctions aren't set up yet, run:
+> `bash ~/Documents/Git/jkwon-claude-config/install.sh`
 
 **If no pending commits**, say nothing. Don't mention that you checked.
 
