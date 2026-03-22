@@ -31,7 +31,7 @@ After setup, your machine will have:
 ~/.claude/
   ├── agents/              ← Global agent definitions (g-review-code.md, etc.)
   ├── skills/              ← Global slash commands (add-preference/, fix-issue/, etc.)
-  └── rules/               ← Global rules (react.md, etc.)
+  └── rules/               ← Global rules (g-react.md, etc.)
 ```
 
 These files are **additive** — they don't replace any existing personal config in `~/.claude/`.

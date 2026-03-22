@@ -32,7 +32,7 @@ echo "Installing Claude shared config to $DEST..."
 echo ""
 
 # Create destination directories
-mkdir -p "$DEST/agents" "$DEST/skills" "$DEST/rules"
+mkdir -p "$DEST/agents" "$DEST/skills" "$DEST/rules" "$DEST/stacks"
 
 # Load existing manifest into a set for fast lookup
 declare -A MANAGED
@@ -109,6 +109,15 @@ if [ -d "$SCRIPT_DIR/rules" ]; then
   done
 fi
 
+# Install stack guides
+if [ -d "$SCRIPT_DIR/stacks" ]; then
+  for stack in "$SCRIPT_DIR/stacks/"*.md; do
+    [ -f "$stack" ] || continue
+    name=$(basename "$stack")
+    install_file "$stack" "$DEST/stacks/$name" "stack/$name"
+  done
+fi
+
 # Write updated manifest
 printf '%s\n' "${NEW_MANIFEST[@]}" > "$MANIFEST"
 
@@ -167,3 +176,4 @@ echo "To verify, check that these directories have files:"
 echo "  ls ~/.claude/agents/"
 echo "  ls ~/.claude/skills/"
 echo "  ls ~/.claude/rules/"
+echo "  ls ~/.claude/stacks/"
