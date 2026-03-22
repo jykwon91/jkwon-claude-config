@@ -1,46 +1,18 @@
 #!/bin/bash
-# post-merge hook: syncs Claude agents and skills to ~/.claude after git pull
+# post-merge hook: syncs Claude global config after git pull
 # Installed by onboard.sh — do not edit manually
 
-set -e
+_claude_config_dir="$HOME/Documents/Git/jkwon-claude-config"
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-CHECKSUM_FILE="$REPO_ROOT/.git/hooks/post-merge.sha256"
-HOOK_FILE="$REPO_ROOT/.git/hooks/post-merge"
-DEST="$HOME/.claude"
-
-# Verify hook integrity before running
-if [ -f "$CHECKSUM_FILE" ]; then
-  expected=$(cat "$CHECKSUM_FILE")
-  actual=$(sha256sum "$HOOK_FILE" 2>/dev/null || shasum -a 256 "$HOOK_FILE" | awk '{print $1}')
-  if [ "$expected" != "$actual" ]; then
-    echo "[claude-config] WARNING: post-merge hook checksum mismatch. Skipping sync."
-    echo "[claude-config] The hook may have been tampered with. Re-run onboard.sh to reinstall."
-    exit 0
+# Pull the global config repo and show what changed
+if [ -d "$_claude_config_dir/.git" ]; then
+  _before=$(git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
+  git -C "$_claude_config_dir" pull -q 2>/dev/null
+  _after=$(git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
+  if [ "$_before" != "$_after" ]; then
+    echo ""
+    echo "[claude-config] Global config updated:"
+    git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | sed 's/^/  /'
+    echo ""
   fi
 fi
-
-# Only sync if agents or skills changed in this pull
-if ! git diff-tree --no-commit-id -r --name-only ORIG_HEAD HEAD 2>/dev/null | grep -q "^\.claude/"; then
-  exit 0
-fi
-
-echo "[claude-config] Syncing agents and skills to ~/.claude..."
-
-# Sync agents
-if [ -d "$REPO_ROOT/.claude/agents" ]; then
-  mkdir -p "$DEST/agents"
-  cp "$REPO_ROOT/.claude/agents/"*.md "$DEST/agents/" 2>/dev/null || true
-fi
-
-# Sync skills
-if [ -d "$REPO_ROOT/.claude/skills" ]; then
-  for skill_dir in "$REPO_ROOT/.claude/skills"/*/; do
-    [ -d "$skill_dir" ] || continue
-    skill_name=$(basename "$skill_dir")
-    mkdir -p "$DEST/skills/$skill_name"
-    cp "$skill_dir/SKILL.md" "$DEST/skills/$skill_name/SKILL.md"
-  done
-fi
-
-echo "[claude-config] Sync complete. Restart Claude Code if it is running."
