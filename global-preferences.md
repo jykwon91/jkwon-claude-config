@@ -30,6 +30,8 @@
 - Always write unit tests alongside new code — strive for high coverage to protect against regressions and breaking changes.
 - E2E tests are regression contracts — when a test fails, the code is broken, not the test. Fix the code to make the test pass. Never change a test just to satisfy broken code. Only update tests when feature requirements explicitly change.
 - Always include E2E layout tests when adding new pages or modifying page layouts.
+- Always write E2E tests that simulate real user interactions (fill forms, click buttons, submit, verify outcomes) — never write tests that only check if elements are visible or rendered.
+- Always write E2E tests that verify skeleton loading states match the loaded page structure — same sections, same grid columns, same element count.
 
 ### Security
 - Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
@@ -59,3 +61,4 @@
 - Always run design agents (UX, architecture, data) before implementing features — design agents are solutioning partners, not post-implementation reviewers.
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Always merge existing feature branches to main before starting new work — check `git branch --no-merged main` at the start of every session and create PRs for any unmerged branches first.
+- When a user corrects a mistake, don't just fix it — identify the root cause and create a systemic fix (test, preference, or workflow change) so the same mistake never reaches the user again.
