@@ -6,6 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo is the shared Claude Code configuration for all projects. It contains global agents, skills, rules, and preferences. Changes here are automatically synced to registered project repos via GitHub Action, and to developer machines via `install.sh` or the `post-merge` hook set up by `onboard.sh`.
 
+## Ownership
+
+The following files are owned by @jykwon91 and must not be modified by automated processes (auto-capture, agents, scripts) or other contributors without explicit approval:
+
+- `CLAUDE.md` — repo rules and structure
+- `global-preferences.md` — universal engineering preferences
+- `install.sh`, `onboard.sh`, `uninstall.sh` — installation scripts
+- `stacks.md` — stack profiles and discovery questions
+- `projects.txt` — registered project registry
+
+**Files that CAN be modified via automated PRs** (e.g., auto-capture from technical users):
+- `stacks/*.md` — stack-specific guides (react.md, python.md, etc.)
+
+When creating automated PRs to `stacks/*.md`, always tag @jykwon91 as reviewer.
+
 ## Workflow
 
 - Never push directly to main — always create a feature branch and open a PR, even for single-file changes.
