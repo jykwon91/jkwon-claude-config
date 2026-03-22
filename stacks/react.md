@@ -1,10 +1,6 @@
----
-description: React best practices — loaded globally for all projects
----
+# React Stack Guide
 
-# React Best Practices
-
-Apply these rules when writing or reviewing React code, prioritized by impact.
+Apply these patterns when the project uses React. Detect React from `package.json` dependencies (`react`, `react-dom`).
 
 ## CRITICAL — Component Architecture
 
@@ -18,9 +14,9 @@ Apply these rules when writing or reviewing React code, prioritized by impact.
 
 ## CRITICAL — State Management
 
-- Server/API state belongs in React Query (or RTK Query) — never in local useState.
-- Shared UI state belongs in Redux slices — never prop-drilled or lifted to distant ancestors.
-- Form state belongs in React Hook Form — never in manual onChange/setState wiring.
+- Server/API state belongs in a data-fetching library (React Query, RTK Query, SWR, or similar) — never in local useState. Use whichever the project already has installed; if none, prefer React Query (TanStack Query).
+- Shared UI state belongs in a state manager (Redux, Zustand, Jotai, or similar) — never prop-drilled or lifted to distant ancestors. Use whichever the project already has installed.
+- Form state belongs in a form library (React Hook Form, Formik, or similar) — never in manual onChange/setState wiring. Use whichever the project already has installed; if none, prefer React Hook Form.
 - URL state (filters, pagination, tabs) belongs in the URL via search params — not in component state.
 - Ephemeral UI state (hover, open/closed) is the only thing that belongs in local useState.
 
@@ -36,10 +32,10 @@ Apply these rules when writing or reviewing React code, prioritized by impact.
 - Never import from barrel files (e.g. `import { x } from 'lib'`) — import directly from the source file.
 - Lazy-load heavy components with dynamic imports (`React.lazy` / `next/dynamic`).
 - Load large data or modules conditionally, only when the feature is activated.
-- Defer non-critical libraries (analytics, logging) until after hydration.
+- Defer non-critical libraries (analytics, logging) until after initial render.
 - Preload based on user intent (hover/focus) before the actual interaction.
 
-## HIGH — Server-Side Performance
+## HIGH — Next.js Specific (skip if the project uses Vite/CRA/other SPA bundler)
 
 - Authenticate Server Actions the same as API routes — verify auth inside each action, never rely on middleware alone.
 - Use `React.cache()` for per-request deduplication of auth checks, DB queries, and expensive computations.
@@ -47,11 +43,15 @@ Apply these rules when writing or reviewing React code, prioritized by impact.
 - Hoist static I/O (fonts, images, config) to module level, not per-request.
 - Schedule non-blocking work (logging, analytics) with `after()` so it runs after the response is sent.
 
-## MEDIUM-HIGH — Client-Side Data Fetching
+## HIGH — Client-Side Data Fetching
 
-- Use SWR for automatic request deduplication, caching, and revalidation across component instances.
+- Use the project's data-fetching library for automatic request deduplication, caching, and revalidation.
 - Add `{ passive: true }` to scroll and touch event listeners to eliminate scroll jank.
 - Version localStorage keys (e.g. `v1_key`) and store only minimal fields; handle storage unavailability.
+
+## HIGH — Date Handling
+
+- Use a date library (date-fns, dayjs, or luxon) for parsing, formatting, and comparison — never use raw `new Date()`, `Date.parse()`, or `toLocaleDateString()`. Use whichever the project already has installed; if none, prefer date-fns (tree-shakeable, no mutable global state).
 
 ## MEDIUM — Re-render Optimization
 
@@ -72,7 +72,6 @@ Apply these rules when writing or reviewing React code, prioritized by impact.
 - Use `useTransition` instead of manual loading state — gives `isPending` and automatic error resilience.
 - Apply `content-visibility: auto` to long lists or off-screen sections to defer rendering.
 - Hoist static JSX outside components to avoid recreation on every render.
-- Use the `Activity` component to preserve state/DOM for components that frequently toggle visibility.
 - Wrap SVG elements in a `div` for hardware-accelerated CSS transforms.
 
 ## LOW-MEDIUM — JavaScript Performance
@@ -88,5 +87,4 @@ Apply these rules when writing or reviewing React code, prioritized by impact.
 ## LOW — Advanced Patterns
 
 - Store event handler callbacks in refs when passed to subscriptions — avoids re-subscribing on every render.
-- Use `useEffectEvent` to access latest values in callbacks without adding them to dependency arrays.
 - Guard one-time app initialization with a module-level boolean to prevent duplicate init on remount.
