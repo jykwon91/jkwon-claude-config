@@ -62,3 +62,4 @@
 - Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
 - Always merge existing feature branches to main before starting new work — check `git branch --no-merged main` at the start of every session and create PRs for any unmerged branches first.
 - When a user corrects a mistake, don't just fix it — identify the root cause and create a systemic fix (test, preference, or workflow change) so the same mistake never reaches the user again.
+- Never create a new PR on the shared config repo (jkwon-claude-config) if one already exists — push additional changes to the existing open PR branch to avoid stale conflicts.
