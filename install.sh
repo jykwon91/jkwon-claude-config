@@ -138,7 +138,18 @@ setup_global_git_hook() {
 
 # claude-config-auto-sync
 # Pull the shared Claude config repo after any git pull
-(cd "$HOME/Documents/Git/jkwon-claude-config" 2>/dev/null && git pull -q 2>/dev/null &)
+_claude_config_dir="$HOME/Documents/Git/jkwon-claude-config"
+if [ -d "$_claude_config_dir/.git" ]; then
+  _before=$(git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
+  git -C "$_claude_config_dir" pull -q 2>/dev/null
+  _after=$(git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
+  if [ "$_before" != "$_after" ]; then
+    echo ""
+    echo "[claude-config] Global config updated:"
+    git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | sed 's/^/  /'
+    echo ""
+  fi
+fi
 HOOK
 
   chmod +x "$hook_file"
