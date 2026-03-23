@@ -27,7 +27,7 @@
 - Before writing a custom solution, research whether a well-supported, well-maintained library already solves the problem. Suggest it as an option if it fits the exact requirement and doesn't significantly increase project overhead.
 
 ### Testing
-- Always write unit tests alongside new code — strive for high coverage to protect against regressions and breaking changes.
+- Never consider a feature complete without writing both backend and frontend tests — unit tests for business logic, E2E tests for user flows. No exceptions.
 - E2E tests are regression contracts — when a test fails, the code is broken, not the test. Fix the code to make the test pass. Never change a test just to satisfy broken code. Only update tests when feature requirements explicitly change.
 - Always include E2E layout tests when adding new pages or modifying page layouts.
 - Always write E2E tests that simulate real user interactions (fill forms, click buttons, submit, verify outcomes) — never write tests that only check if elements are visible or rendered.
@@ -63,3 +63,4 @@
 - Always merge existing feature branches to main before starting new work — check `git branch --no-merged main` at the start of every session and create PRs for any unmerged branches first.
 - When a user corrects a mistake, don't just fix it — identify the root cause and create a systemic fix (test, preference, or workflow change) so the same mistake never reaches the user again.
 - Never create a new PR on the shared config repo (jkwon-claude-config) if one already exists — push additional changes to the existing open PR branch to avoid stale conflicts.
+- Always write and run E2E tests for every new feature before committing — tests must cover the full user flow (form submission, API interaction, state changes, error handling), not just rendering or visibility checks.
