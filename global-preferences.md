@@ -27,7 +27,7 @@
 - Before writing a custom solution, research whether a well-supported, well-maintained library already solves the problem. Suggest it as an option if it fits the exact requirement and doesn't significantly increase project overhead.
 
 ### Testing
-- Never consider a feature complete without writing both backend and frontend tests — unit tests for business logic, E2E tests for user flows. No exceptions.
+- Always include tests in the same commit as the code change — never commit logic without corresponding tests, then add tests as a follow-up. Tests are part of the deliverable, not a separate step.
 - E2E tests are regression contracts — when a test fails, the code is broken, not the test. Fix the code to make the test pass. Never change a test just to satisfy broken code. Only update tests when feature requirements explicitly change.
 - Always include E2E layout tests when adding new pages or modifying page layouts.
 - Always write E2E tests that simulate real user interactions (fill forms, click buttons, submit, verify outcomes) — never write tests that only check if elements are visible or rendered.
