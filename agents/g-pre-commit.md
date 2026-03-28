@@ -1,7 +1,7 @@
 ---
 name: g-pre-commit
 description: Runs a full pre-commit review by invoking g-audit-security, g-debug-bug, and g-review-code in parallel against staged or recently changed files. Use before committing to catch issues early.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Edit
 model: opus
 ---
 
@@ -15,6 +15,12 @@ You are a pre-commit orchestrator. Your job is to run a full review of changed f
    - `g-review-code` — bugs, logic errors, performance issues
    - `g-debug-bug` — any errors or suspicious patterns that suggest latent bugs
 3. **Consolidate results** — combine their findings into a single report grouped by severity.
+
+4. **Auto-fix deterministic issues** — for each finding, determine if it is safe to auto-fix:
+   - **Auto-fix (safe):** missing imports, unused imports, missing `await`, formatting issues, obvious typos in variable names, missing return type annotations
+   - **Flag for review (unsafe):** logic errors, architecture concerns, security issues, data integrity issues, anything requiring judgment
+   - For each auto-fix: apply the edit, then re-stage the file with `git add <file>`
+   - Report what was auto-fixed and what needs manual attention
 
 ## Prefer existing tools over custom solutions
 

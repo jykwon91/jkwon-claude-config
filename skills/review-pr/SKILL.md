@@ -9,7 +9,14 @@ Review pull request #$ARGUMENTS:
 
 1. Fetch the diff: `gh pr diff $ARGUMENTS`
 2. Read the PR description: `gh pr view $ARGUMENTS`
-3. Use the `code-reviewer` agent to review changed files for bugs and quality
-4. Use the `security-auditor` agent if changes touch auth, user data, or API endpoints
-5. Summarize findings and post a review comment:
-   `gh pr review $ARGUMENTS --comment --body "<your review>"`
+3. Categorize changed files:
+   - Frontend files: `.tsx`, `.ts`, `.jsx`, `.js`, `.css` in frontend/client/src directories
+   - Backend files: `.py`, `.go`, `.rs`, `.java` in backend/server/api directories
+   - Auth/security files: anything touching auth, tokens, user data, API endpoints, permissions
+4. Launch review agents **in parallel** based on what changed:
+   - **Always:** `g-review-code` on all changed files
+   - **If frontend files changed:** `g-review-frontend`
+   - **If backend files changed:** `g-review-backend`
+   - **If auth/security files changed:** `g-audit-security`
+5. Consolidate findings from all agents into a single review
+6. Post the review: `gh pr review $ARGUMENTS --comment --body "<your review>"`

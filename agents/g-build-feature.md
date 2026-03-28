@@ -62,10 +62,17 @@ Map the codebase to understand what exists before changing anything.
 - Use Explore agent to find all files related to the feature area
 - Identify existing patterns to follow (models, routes, components, tests)
 - Note the tech stack, directory structure, and naming conventions
+- **Build a project context string** to pass to all sub-agents (avoids each agent re-detecting the stack):
+  - Stack: e.g., "React+Vite frontend, FastAPI backend, PostgreSQL, Alembic migrations"
+  - Key directories: e.g., "frontend/src/, backend/app/, backend/alembic/"
+  - Stack guides: e.g., "react.md, fastapi.md, python.md"
+  - Test frameworks: e.g., "Vitest (frontend), pytest (backend), Playwright (E2E)"
 
 ### Step 2: Design (BLOCKING — must complete before implementation)
 
 Launch design agents **in parallel**. Wait for all results before proceeding.
+
+**Pass the project context string from Step 1 to every agent** so they skip their own stack detection.
 
 **Always run:**
 - `g-design-data` — schema, models, migrations, query patterns
@@ -85,9 +92,12 @@ Synthesize the design agent outputs into a coherent implementation plan. If agen
 
 Build the feature based on the approved designs. Follow this order:
 
-1. **Database** — models, migrations (if applicable)
-2. **Backend** — repositories, services, mappers, API routes, schemas
-3. **Frontend** — types, API hooks, components, pages, routing
+1. **Database** — models, migrations (if applicable). Must complete before backend or frontend.
+2. **Backend + Frontend (in parallel)** — after the database layer is done, launch both in parallel:
+   - `g-implement-backend` — repositories, services, mappers, API routes, schemas
+   - `g-implement-frontend` — types, API hooks, components, pages, routing
+   - Launch both agents in the same message so they run concurrently
+3. **Integration verification** — after both complete, verify API contracts match: frontend request/response types align with backend schemas and endpoint signatures
 
 Implementation rules:
 - Follow existing patterns in the codebase — match naming, structure, and style
@@ -116,14 +126,21 @@ What NOT to do:
 - Don't let cleanup grow larger than the feature itself — if a file needs a major overhaul, note it and move on
 - Don't break existing tests — if your cleanup changes behavior, you've gone too far
 
-### Step 4: Write tests
-
-Launch test agents:
-- `g-write-tests` — unit tests for backend and frontend code
-- If the project has a `g-qa-e2e` agent, use it for E2E test planning and writing
-- If no `g-qa-e2e` exists, run `g-qa` first to generate one, then use it
+### Step 4: Write tests (MANDATORY — both unit AND E2E)
 
 Detect the project's test framework from config files (jest, vitest, pytest, go test, etc.) — never hardcode test commands.
+
+Launch test agents:
+
+1. `g-write-tests` — unit tests for backend and frontend code
+2. E2E tests — check if a `g-qa-e2e` agent exists for the project:
+   - **If YES:** launch `g-qa-e2e` for E2E tests covering the feature's primary user flows
+   - **If NO:** explain to the user in plain language and ask permission before proceeding:
+     > "Before I build this feature, I need to set up testing intelligence for your project. This is a one-time step — I'll spend a few minutes learning your project's critical flows so I can write better tests going forward. Should I go ahead?"
+     - If user agrees → run `g-qa` to generate `g-qa-e2e`, then use it for E2E tests
+     - Never mention agent names or technical jargon — keep it conversational
+
+**HARD GATE:** Step 4 is not complete until BOTH unit tests AND at least one E2E test for the new feature exist. Do not advance to Step 5 without E2E tests.
 
 ### Step 5: Full Validation Pipeline (loop until 0 errors)
 
@@ -141,12 +158,19 @@ Detect the project's test runners, linters, and build tools from config files (`
 - After individual fixes, re-run full suites to confirm no regressions
 - Loop until both suites pass (max 5 iterations per failure)
 
-**Stage 3 — Server check (if E2E tests exist):**
+**Stage 3 — Server check:**
+- Check if the project has an E2E test framework configured (playwright.config, cypress.config, etc.)
+- If no E2E framework exists, **FAIL**: "No E2E test framework configured. Pipeline requires E2E coverage."
 - Verify frontend and backend servers are running
-- If not running, report as blocker — do NOT attempt to start servers
+- If servers are NOT running:
+  a. Read CLAUDE.md for the project's dev server start commands
+  b. Start servers in background
+  c. Wait up to 30 seconds for servers to become healthy (poll health endpoints or ports)
+  d. If servers fail to start after 30 seconds, THEN report as blocker and stop
 
-**Stage 4 — E2E tests (if they exist):**
+**Stage 4 — E2E tests (MANDATORY):**
 - Run the full E2E suite with JSON reporter, parse failures into structured list
+- If zero tests run, **FAIL**: "No E2E tests found. Pipeline requires E2E coverage for the feature."
 - Group failures by root cause
 - For each root cause: read the test + app code, launch `g-diagnose-e2e` for ranked hypotheses, launch `g-fix-e2e` to apply fix #1
 - Re-run failing tests after each fix. If still fails, try fix #2 via `g-fix-e2e`
