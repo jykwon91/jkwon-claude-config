@@ -50,7 +50,7 @@
 ### Data Integrity
 - Always inspect actual data before fixing bugs — query the database, check API responses, examine extraction output. Never assume what the data looks like.
 - Never write fixes that drop, nullify, or silence valid data to avoid errors — if real data violates a constraint, fix the field mapping or the constraint, not the data. Data accuracy with the source is non-negotiable.
-- Never introduce tech debt — if a solution requires TODO comments, temporary workarounds, known shortcuts, or "we'll fix this later" compromises, find the proper solution now or flag it as a blocker before proceeding.
+- Never introduce tech debt — every commit must leave the codebase cleaner than or equal to how it was found. If a change creates a new issue (broken test, missing validation, dead code, loose typing, missing skeleton), fix it in the same commit. Never defer new issues to a tech debt tracker — TECH_DEBT.md is for pre-existing issues discovered during audits, not for deferring work from the current session.
 
 ### Refactoring
 - Never refactor or rewrite components without preserving all existing functionality — inventory current features before rewriting, verify each feature works after, and get explicit confirmation before removing any feature.
