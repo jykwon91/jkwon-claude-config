@@ -58,27 +58,33 @@ After all individual fixes, re-run full suites to confirm no regressions.
 
 ---
 
-### Stage 3: Prerequisites Check (if E2E tests exist)
+### Stage 3: Prerequisites Check
 
-Verify any required servers are running.
-
-If servers are down:
-- Report which server(s) are not running
-- **Do NOT attempt to start servers** — report as blocker and stop
+1. Check if the project has an E2E test framework configured (playwright.config, cypress.config, etc.)
+   - If no E2E framework exists, **FAIL** with clear message: "No E2E test framework configured. Pipeline requires E2E coverage."
+2. Verify frontend and backend servers are running
+3. If servers are NOT running:
+   a. Read CLAUDE.md for the project's dev server start commands
+   b. Start servers in background
+   c. Wait up to 30 seconds for servers to become healthy (poll health endpoints or ports)
+   d. If servers fail to start after 30 seconds, THEN report as blocker and stop
+4. Only advance when servers respond to health checks
 
 ---
 
-### Stage 4: E2E Tests + Fix Loop (if E2E tests exist)
+### Stage 4: E2E Tests + Fix Loop (MANDATORY)
 
 **You run the tests and parse failures. `g-diagnose-e2e` diagnoses. `g-fix-e2e` edits. You verify.**
 
 **4a. Run the full E2E suite** using JSON reporter and parse failures into a structured list of: test name, file, line, error message.
 
-**4b. If all pass** → advance to Stage 5.
+**4b. If zero tests ran**, **FAIL** with clear message: "No E2E tests found. Pipeline requires E2E coverage for the feature."
 
-**4c. Group failures by root cause.** Multiple tests often fail for the same reason.
+**4c. If all pass** → advance to Stage 5.
 
-**4d. For each root cause:**
+**4d. Group failures by root cause.** Multiple tests often fail for the same reason.
+
+**4e. For each root cause:**
 1. Read the failing test file and the app code it exercises
 2. Launch `g-diagnose-e2e` with: test name, error message, and the file contents you read
 3. Get back ranked fix hypotheses (exact OLD/NEW edits)
@@ -87,13 +93,17 @@ If servers are down:
 6. If still fails → send `g-fix-e2e` "didn't work, try fix #2"
 7. If all 3 hypotheses exhausted → log to TECH_DEBT.md, move to next failure
 
-**4e. After all failures addressed**, full regression run. If new failures → repeat from 4a.
+**4f. After all failures addressed**, full regression run. If new failures → repeat from 4a.
 
 **Safety valve:** Max 3 fix attempts per failure. Max 3 full regression loops.
 
 ---
 
-### Stage 5: Code Review (Inline)
+### Stage 5+6: Code Review + Final Validation (in parallel)
+
+Launch both of these simultaneously:
+
+**5a. Code Review (Inline)**
 
 Review all files changed during this pipeline run (`git diff --name-only HEAD`).
 
@@ -111,13 +121,14 @@ Review all files changed during this pipeline run (`git diff --name-only HEAD`).
 - Missing type annotations
 - Suggestions for better patterns
 
-Re-run relevant test suites after each Must Fix.
+**5b. Final Validation**
 
----
+Re-run all test suites. Collect results.
 
-### Stage 6: Final Validation
-
-Re-run all test suites one last time. If anything fails, go back to the relevant stage.
+**After both complete:**
+- If code review found "Must Fix" issues AND tests passed: fix the issues, then re-run only the test suites affected by the fixes
+- If code review found no "Must Fix" issues AND tests passed: advance to Stage 7
+- If tests failed: go back to the relevant stage (Stage 1, 2, or 4)
 
 ---
 
@@ -157,7 +168,8 @@ Write all non-blocking issues discovered during THIS run to `TECH_DEBT.md`. This
 
 **How to log:**
 1. Read the current `TECH_DEBT.md` to match format and avoid duplicates
-2. Determine severity:
+2. **Dedup check:** For each issue you're about to log, check if a matching issue already exists (match on file path + short description). Skip any issue that's already listed. Use `g-tech-debt-scan`'s format as the canonical format.
+3. Determine severity:
    - **Critical** — data loss, data corruption, security breach, broken user flows
    - **High** — silent failures, wrong data shown to users, missing access control
    - **Medium** — dead code, loose typing, missing validation on non-critical fields
@@ -176,7 +188,7 @@ Write all non-blocking issues discovered during THIS run to `TECH_DEBT.md`. This
 
 - **Max 5 attempts per individual failure.**
 - **Max 3 full pipeline loops.**
-- **Never start servers.** Report and stop.
+- **Auto-start servers if needed** (Stage 3), but stop if they fail to start within 30 seconds.
 - **Never modify test files.** Tests are contracts.
 - **Never modify config files** unless the config itself is the root cause.
 

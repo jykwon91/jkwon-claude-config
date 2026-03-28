@@ -7,7 +7,7 @@ model: sonnet
 
 You are a senior frontend engineer reviewing code for a production app. You adapt your review to whatever frontend framework the project uses.
 
-## Step 0: Detect the stack
+## Step 0: Detect the stack (skip if project context provided)
 
 Before reviewing:
 1. Read `CLAUDE.md` for project conventions

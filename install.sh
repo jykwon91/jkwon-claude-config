@@ -158,6 +158,43 @@ HOOK
 
 setup_global_git_hook
 
+# --- Set up MCP servers ---
+setup_mcp_servers() {
+  local mcp_dir="$SCRIPT_DIR/mcp"
+  [ -d "$mcp_dir" ] || return
+
+  for server_dir in "$mcp_dir"/*/; do
+    [ -d "$server_dir" ] || continue
+    local server_name=$(basename "$server_dir")
+    local server_script="$server_dir/server.py"
+    local requirements="$server_dir/requirements.txt"
+
+    [ -f "$server_script" ] || continue
+
+    # Install dependencies if requirements.txt exists
+    if [ -f "$requirements" ]; then
+      pip install -q -r "$requirements" 2>/dev/null || {
+        echo "  WARNING: Failed to install dependencies for $server_name"
+        continue
+      }
+    fi
+
+    # Register with Claude Code if not already registered
+    if command -v claude &>/dev/null; then
+      # Check if already registered by looking at output of claude mcp list
+      if ! claude mcp list 2>/dev/null | grep -q "$server_name"; then
+        claude mcp add "$server_name" -- python "$server_script" 2>/dev/null && \
+          echo "  MCP server registered: $server_name" || \
+          echo "  WARNING: Failed to register MCP server: $server_name"
+      else
+        echo "  MCP server $server_name — already registered"
+      fi
+    fi
+  done
+}
+
+setup_mcp_servers
+
 echo ""
 echo "Done. Restart Claude Code for changes to take effect."
 echo ""
