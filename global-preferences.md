@@ -64,3 +64,4 @@
 - When a user corrects a mistake, don't just fix it — identify the root cause and create a systemic fix (test, preference, or workflow change) so the same mistake never reaches the user again.
 - Never create a new PR on the shared config repo (jkwon-claude-config) if one already exists — push additional changes to the existing open PR branch to avoid stale conflicts.
 - Always write and run E2E tests for every new feature before committing — tests must cover the full user flow (form submission, API interaction, state changes, error handling), not just rendering or visibility checks.
+- Always run database migrations immediately after creating or modifying migration files — never leave migrations unapplied, as the running dev server will crash on the next request that touches new or altered columns.
