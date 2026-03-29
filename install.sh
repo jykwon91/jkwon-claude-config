@@ -195,6 +195,71 @@ setup_mcp_servers() {
 
 setup_mcp_servers
 
+# --- Merge shared hooks into ~/.claude/settings.json ---
+setup_shared_hooks() {
+  local shared_settings="$SCRIPT_DIR/settings.json"
+  local user_settings="$DEST/settings.json"
+
+  [ -f "$shared_settings" ] || return
+
+  if ! command -v py &>/dev/null && ! command -v python3 &>/dev/null; then
+    echo "  WARNING: Python not found — cannot merge shared hooks into settings.json"
+    return
+  fi
+
+  local py_cmd="py"
+  command -v py &>/dev/null || py_cmd="python3"
+
+  $py_cmd - "$shared_settings" "$user_settings" << 'PYMERGE'
+import sys, json, os
+
+shared_path, user_path = sys.argv[1], sys.argv[2]
+
+with open(shared_path) as f:
+    shared = json.load(f)
+
+user = {}
+if os.path.exists(user_path):
+    with open(user_path) as f:
+        user = json.load(f)
+
+# Merge hooks: for each event, append shared hook entries that don't already exist
+shared_hooks = shared.get("hooks", {})
+user_hooks = user.setdefault("hooks", {})
+
+for event, entries in shared_hooks.items():
+    existing = user_hooks.setdefault(event, [])
+    for entry in entries:
+        # Check if a hook with the same matcher already has the same command
+        for hook_def in entry.get("hooks", []):
+            cmd = hook_def.get("command", "")
+            already_exists = any(
+                cmd in h.get("command", "")
+                for existing_entry in existing
+                for h in existing_entry.get("hooks", [])
+            )
+            if already_exists:
+                break
+        else:
+            # Find existing entry with same matcher to append hooks to
+            matcher = entry.get("matcher")
+            matched_entry = next((e for e in existing if e.get("matcher") == matcher), None)
+            if matched_entry:
+                matched_entry["hooks"].extend(entry["hooks"])
+            else:
+                existing.append(entry)
+
+with open(user_path, "w") as f:
+    json.dump(user, f, indent=2)
+    f.write("\n")
+
+PYMERGE
+
+  echo "  Shared hooks merged into settings.json"
+}
+
+setup_shared_hooks
+
 echo ""
 echo "Done. Restart Claude Code for changes to take effect."
 echo ""
