@@ -51,6 +51,7 @@
 - Always inspect actual data before fixing bugs — query the database, check API responses, examine extraction output. Never assume what the data looks like.
 - Never make destructive data decisions (deletes, merges, choosing between records) based on metadata alone — always verify by inspecting the actual content of the records or documents involved.
 - Never write fixes that drop, nullify, or silence valid data to avoid errors — if real data violates a constraint, fix the field mapping or the constraint, not the data. Data accuracy with the source is non-negotiable.
+- Always evaluate schema changes against the full existing schema — check for field duplication across related tables, inconsistent FK cascade policies, missing indexes for new query patterns, and whether the new model fits cleanly with existing relationships. Flag conflicts before implementing.
 - Never introduce tech debt — every commit must leave the codebase cleaner than or equal to how it was found. If a change creates a new issue (broken test, missing validation, dead code, loose typing, missing skeleton), fix it in the same commit. Never defer new issues to a tech debt tracker — TECH_DEBT.md is for pre-existing issues discovered during audits, not for deferring work from the current session.
 
 ### Refactoring
