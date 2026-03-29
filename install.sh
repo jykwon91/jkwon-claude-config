@@ -342,8 +342,8 @@ function Invoke-GitWithConfigSync {
                     }
                 }
                 Write-Host ""
-                Write-Host "  To disable: `$env:CLAUDE_CONFIG_SYNC = '0'" -ForegroundColor DarkGray
-                Write-Host "  To remove permanently: edit `$PROFILE" -ForegroundColor DarkGray
+                Write-Host "  To turn off auto-sync for this session, run:" -ForegroundColor DarkGray
+                Write-Host "    `$env:CLAUDE_CONFIG_SYNC = '0'" -ForegroundColor DarkGray
                 Write-Host ""
             } else {
                 Write-Host " up to date" -ForegroundColor DarkGray
@@ -416,8 +416,8 @@ git() {
           bash "$_claude_config_dir/install.sh" 2>/dev/null | grep -E "Symlinked|hooks|settings|MCP" | sed 's/^/  /'
         fi
         echo ""
-        printf "\033[90m  To disable: export CLAUDE_CONFIG_SYNC=0\033[0m\n"
-        printf "\033[90m  To remove permanently: edit %s\033[0m\n" "$profile_file_path"
+        printf "\033[90m  To turn off auto-sync for this session, run:\033[0m\n"
+        printf "\033[90m    export CLAUDE_CONFIG_SYNC=0\033[0m\n"
         echo ""
       else
         printf "\033[90m up to date\033[0m\n"
