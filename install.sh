@@ -290,27 +290,62 @@ setup_shell_profile_sync() {
     cat >> "$ps_profile" << 'PSPROFILE'
 
 # claude-config-git-sync
-# Wraps git so every "git pull" also checks the global Claude config repo for updates
+# Wraps git so every "git pull" also checks the global Claude config repo for updates.
+# Set $env:CLAUDE_CONFIG_SYNC = "0" to disable, or remove this block from your profile.
 function Invoke-GitWithConfigSync {
     & git.exe @args
     if ($args -and $args[0] -eq 'pull') {
+        if ($env:CLAUDE_CONFIG_SYNC -eq "0") { return }
         $configDir = "$HOME\Documents\Git\jkwon-claude-config"
         if (Test-Path "$configDir\.git") {
-            $before = & git.exe -C $configDir rev-parse HEAD 2>$null
-            & git.exe -C $configDir pull -q 2>$null
-            $after = & git.exe -C $configDir rev-parse HEAD 2>$null
-            if ($before -ne $after) {
-                $logs = & git.exe -C $configDir log --oneline "$before..$after" 2>$null
+            $dirty = & git.exe -C $configDir status --porcelain 2>$null
+            if ($dirty) { return }
+            Write-Host "Syncing Claude global config..." -ForegroundColor DarkGray -NoNewline
+            $fetchJob = Start-Job -ScriptBlock {
+                param($dir)
+                & git.exe -C $dir fetch -q 2>$null
+            } -ArgumentList $configDir
+            $completed = Wait-Job $fetchJob -Timeout 5
+            if (-not $completed) {
+                Stop-Job $fetchJob
+                Remove-Job $fetchJob -Force
+                Write-Host " timed out (skipped)" -ForegroundColor DarkGray
+                return
+            }
+            Remove-Job $fetchJob -Force
+            $localMain = & git.exe -C $configDir rev-parse main 2>$null
+            $remoteMain = & git.exe -C $configDir rev-parse origin/main 2>$null
+            if ($localMain -eq $remoteMain) {
+                Write-Host " up to date" -ForegroundColor DarkGray
+                return
+            }
+            $currentBranch = & git.exe -C $configDir rev-parse --abbrev-ref HEAD 2>$null
+            $wasOnMain = $currentBranch -eq "main"
+            if (-not $wasOnMain) {
+                & git.exe -C $configDir checkout main -q 2>$null
+            }
+            & git.exe -C $configDir pull --ff-only -q 2>$null
+            $after = & git.exe -C $configDir rev-parse main 2>$null
+            if ($localMain -ne $after) {
+                $logs = & git.exe -C $configDir log --oneline "$localMain..$after" 2>$null
                 $count = ($logs | Measure-Object).Count
                 Write-Host ""
                 Write-Host "Global Claude config updated and applied ($count change(s)):" -ForegroundColor Green
                 $logs | ForEach-Object { Write-Host "  $_" }
-                $changed = & git.exe -C $configDir diff --name-only "$before..$after" 2>$null
+                $changed = & git.exe -C $configDir diff --name-only "$localMain..$after" 2>$null
                 if ($changed -match "settings\.json|install\.sh|skills/") {
                     Write-Host "  Applying config changes..." -ForegroundColor DarkGray
                     & bash "$configDir/install.sh" 2>$null | Select-String "Symlinked|hooks|settings|MCP" | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
                 }
                 Write-Host ""
+                Write-Host "  To disable: `$env:CLAUDE_CONFIG_SYNC = '0'" -ForegroundColor DarkGray
+                Write-Host "  To remove permanently: edit `$PROFILE" -ForegroundColor DarkGray
+                Write-Host ""
+            } else {
+                Write-Host " up to date" -ForegroundColor DarkGray
+            }
+            if (-not $wasOnMain) {
+                & git.exe -C $configDir checkout $currentBranch -q 2>$null
             }
         }
     }
@@ -341,26 +376,50 @@ PSPROFILE
     cat >> "$profile_file" << 'SHPROFILE'
 
 # claude-config-git-sync
-# Wraps git so every "git pull" also checks the global Claude config repo for updates
+# Wraps git so every "git pull" also checks the global Claude config repo for updates.
+# Set CLAUDE_CONFIG_SYNC=0 to disable, or remove this block from your shell profile.
 git() {
   command git "$@"
   if [ "$1" = "pull" ]; then
+    [ "$CLAUDE_CONFIG_SYNC" = "0" ] && return
     _claude_config_dir="$HOME/Documents/Git/jkwon-claude-config"
     if [ -d "$_claude_config_dir/.git" ]; then
-      _before=$(command git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
-      command git -C "$_claude_config_dir" pull -q 2>/dev/null
-      _after=$(command git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
-      if [ "$_before" != "$_after" ]; then
-        _count=$(command git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | wc -l | tr -d ' ')
+      _dirty=$(command git -C "$_claude_config_dir" status --porcelain 2>/dev/null)
+      if [ -n "$_dirty" ]; then return; fi
+      printf "\033[90mSyncing Claude global config...\033[0m"
+      if command -v timeout &>/dev/null; then
+        timeout 5 command git -C "$_claude_config_dir" fetch -q 2>/dev/null || { printf "\033[90m timed out (skipped)\033[0m\n"; return; }
+      else
+        command git -C "$_claude_config_dir" fetch -q 2>/dev/null
+      fi
+      _local_main=$(command git -C "$_claude_config_dir" rev-parse main 2>/dev/null)
+      _remote_main=$(command git -C "$_claude_config_dir" rev-parse origin/main 2>/dev/null)
+      if [ "$_local_main" = "$_remote_main" ]; then printf "\033[90m up to date\033[0m\n"; return; fi
+      _current_branch=$(command git -C "$_claude_config_dir" rev-parse --abbrev-ref HEAD 2>/dev/null)
+      if [ "$_current_branch" != "main" ]; then
+        command git -C "$_claude_config_dir" checkout main -q 2>/dev/null
+      fi
+      command git -C "$_claude_config_dir" pull --ff-only -q 2>/dev/null
+      _after=$(command git -C "$_claude_config_dir" rev-parse main 2>/dev/null)
+      if [ "$_local_main" != "$_after" ]; then
+        _count=$(command git -C "$_claude_config_dir" log --oneline "$_local_main..$_after" 2>/dev/null | wc -l | tr -d ' ')
         echo ""
-        echo "Global Claude config updated and applied ($_count change(s)):"
-        command git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | sed 's/^/  /'
-        _changed=$(command git -C "$_claude_config_dir" diff --name-only "$_before..$_after" 2>/dev/null)
+        printf "\033[32mGlobal Claude config updated and applied (%s change(s)):\033[0m\n" "$_count"
+        command git -C "$_claude_config_dir" log --oneline "$_local_main..$_after" 2>/dev/null | sed 's/^/  /'
+        _changed=$(command git -C "$_claude_config_dir" diff --name-only "$_local_main..$_after" 2>/dev/null)
         if echo "$_changed" | grep -qE "settings\.json|install\.sh|skills/"; then
-          echo "  Applying config changes..."
+          printf "\033[90m  Applying config changes...\033[0m\n"
           bash "$_claude_config_dir/install.sh" 2>/dev/null | grep -E "Symlinked|hooks|settings|MCP" | sed 's/^/  /'
         fi
         echo ""
+        printf "\033[90m  To disable: export CLAUDE_CONFIG_SYNC=0\033[0m\n"
+        printf "\033[90m  To remove permanently: edit %s\033[0m\n" "$profile_file_path"
+        echo ""
+      else
+        printf "\033[90m up to date\033[0m\n"
+      fi
+      if [ "$_current_branch" != "main" ]; then
+        command git -C "$_claude_config_dir" checkout "$_current_branch" -q 2>/dev/null
       fi
     fi
   fi
