@@ -144,8 +144,9 @@ if [ -d "$_claude_config_dir/.git" ]; then
   git -C "$_claude_config_dir" pull -q 2>/dev/null
   _after=$(git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
   if [ "$_before" != "$_after" ]; then
+    _count=$(git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | wc -l | tr -d ' ')
     echo ""
-    echo "[claude-config] Global config updated:"
+    echo "Global Claude config updated and applied ($_count change(s)):"
     git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | sed 's/^/  /'
     # Re-merge settings.json if it changed
     if git -C "$_claude_config_dir" diff --name-only "$_before..$_after" 2>/dev/null | grep -q "settings.json"; then
