@@ -70,23 +70,29 @@ Map the codebase to understand what exists before changing anything.
 
 ### Step 2: Design (BLOCKING — must complete before implementation)
 
-Launch design agents **in parallel**. Wait for all results before proceeding.
+Data design runs **first** because it constrains everything downstream. Architecture, UX, and other agents run **after** and receive the data design output.
 
 **Pass the project context string from Step 1 to every agent** so they skip their own stack detection.
 
-**Always run:**
-- `g-design-data` — schema, models, migrations, query patterns
-- `g-design-architecture` — layering, modularity, service boundaries
-- `g-design-ux` — interaction flows, states (loading/error/empty), accessibility, component structure
+**Phase 1 — Data design (runs first, alone):**
+- `g-design-data` — storage selection, schema structure, relationships, indexes, query patterns, cross-store consistency. Its output includes recommendations for the architecture and UX agents.
+
+**Phase 2 — All other design agents (run in parallel, after data design completes):**
+
+Pass the data design output to each agent so they design within the data constraints.
+
+Always run:
+- `g-design-architecture` — layering, modularity, service boundaries (informed by data store choices)
+- `g-design-ux` — interaction flows, states (loading/error/empty), accessibility (informed by what data is available and how)
 - `g-design-libraries` — research existing solutions before building custom
 - `g-design-data-analyst` — analytical queries, reporting, aggregation, export compatibility
 
-**Conditionally run:**
+Conditionally run:
 - `g-design-cpa` — ONLY if the feature touches financial data (transactions, income/expenses, tax, accounting, categories, invoices, reconciliation)
 - `g-design-prompt` — ONLY if the feature involves AI extraction, new document types, or prompt changes
 - `g-design-security` — ONLY if the feature involves auth, access control, tokens, encryption, or user data
 
-Synthesize the design agent outputs into a coherent implementation plan. If agents disagree, prefer the recommendation that gives the best end-user experience.
+Synthesize the design agent outputs into a coherent implementation plan. If agents disagree, prefer the recommendation that gives the best end-user experience — but never override data design decisions without justification, since they are foundational.
 
 ### Step 3: Implement
 
