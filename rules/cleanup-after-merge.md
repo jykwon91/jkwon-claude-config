@@ -6,10 +6,10 @@ description: Clean up local branches after PRs are merged — no hanging branche
 
 After every `gh pr merge` or after confirming a PR has been merged:
 
-1. **Delete the local branch** that was just merged:
+1. **Delete the local and remote branch** that was just merged:
 
 ```bash
-git checkout main && git pull && git branch -d <branch-name>
+git checkout main && git pull && git branch -d <branch-name> && git push origin --delete <branch-name>
 ```
 
 2. **Prune stale remote tracking branches**:
@@ -24,10 +24,11 @@ git remote prune origin
 git branch --merged main | grep -v '^\*\|main\|master'
 ```
 
-If any exist, delete them all:
+If any exist, delete them all (local and remote):
 
 ```bash
-git branch --merged main | grep -v '^\*\|main\|master' | xargs git branch -d
+git branch --merged main | grep -v '^\*\|main\|master' | while read b; do git branch -d "$b" && git push origin --delete "$b" 2>/dev/null; done
+git remote prune origin
 ```
 
-**Never leave merged branches hanging.** If a branch's PR is merged, the branch should be deleted immediately — not left for a future cleanup session.
+**Never leave merged branches hanging — locally or on GitHub.** If a branch's PR is merged, both the local and remote branch should be deleted immediately.
