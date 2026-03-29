@@ -15,37 +15,46 @@ Generate a compressed summary of the current project's volatile state — the th
 - Detect from `package.json`, `requirements.txt`, `pyproject.toml`, `*.csproj`, `go.mod`, etc.
 - Note: framework, ORM, test framework, styling, state management, data fetching library
 
-### 2. Shared UI Components (frontend only)
-- Glob for shared/reusable component files (e.g., `**/shared/components/**/*.{tsx,vue,svelte}`, `**/components/ui/**/*`)
+### 2. Directory Map
+- Run `ls` or glob on the project root and key subdirectories to discover the actual structure
+- Identify which directories contain: components, models/entities, routes/controllers, services, store/state, tests
+- Do NOT assume directory names — discover them from the project
+
+### 3. Shared UI Components (frontend only)
+- From the directory map, find where reusable/shared components live (could be `components/ui/`, `shared/components/`, `common/`, `lib/`, or any other structure)
 - For each component: extract the props interface/type (just the type definition, not the implementation)
 - Keep it concise — component name + props only
 
-### 3. Data Models (backend only)
-- Glob for model files (e.g., `**/models/**/*.py`, `**/entities/**/*.cs`, `**/models/**/*.go`)
+### 4. Data Models (backend only)
+- From the directory map, find where models/entities are defined (could be `models/`, `entities/`, `domain/`, `schema/`, or any other structure)
 - For each model: list field names and types (just the schema, not methods)
 - Note relationships between models
 
-### 4. API Routes
-- Grep for route/endpoint definitions
+### 5. API Routes
+- From the directory map, find where routes/controllers are defined
+- Grep for route decorators or endpoint definitions (e.g., `@router`, `@app.`, `[HttpGet]`, `r.GET`, `router.get`)
 - List: HTTP method, path, brief purpose
 - Group by resource/domain
 
-### 5. Store/State Management (frontend only)
-- Identify the data fetching pattern (RTK Query, React Query, SWR, Pinia, etc.)
+### 6. Store/State Management (frontend only)
+- From the directory map, find where data fetching/state is defined
+- Identify the pattern (RTK Query, React Query, SWR, Pinia, Vuex, NgRx, Zustand, etc.)
 - List existing query/mutation hooks and their endpoints
 - Note the pattern for adding new endpoints
 
-### 6. Test Patterns
+### 7. Test Patterns
+- From the directory map, find where tests live
 - Read 1 backend test and 1 frontend test to extract:
   - Test framework and assertion style
   - Mocking approach (how are APIs/DB mocked?)
   - Fixture patterns
   - File naming convention
 
-### 7. Naming Conventions
-- File naming (kebab-case, PascalCase, snake_case)
-- Directory structure pattern (by feature? by type?)
-- Import style (absolute paths, aliases like `@/`)
+### 8. Naming Conventions
+- Observe from discovered files (don't assume):
+  - File naming (kebab-case, PascalCase, snake_case)
+  - Directory structure pattern (by feature? by type?)
+  - Import style (absolute paths, aliases, relative)
 
 ## Output format
 
