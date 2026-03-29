@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push:*)",
+            "command": "py -c \"import sys,json,subprocess;data=json.load(sys.stdin);branch=subprocess.run(['git','rev-parse','--abbrev-ref','HEAD'],capture_output=True,text=True).stdout.strip();state=subprocess.run(['gh','pr','view',branch,'--json','state','--jq','.state'],capture_output=True,text=True).stdout.strip() if branch and branch not in('main','master') else '';print(json.dumps({'decision':'block','reason':f'PR for branch {branch} is already MERGED. Create a new branch and cherry-pick your commits.'})) if state=='MERGED' else print('{}')\"",
+            "timeout": 10,
+            "statusMessage": "Checking if PR is already merged..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr merge:*)",
+            "command": "bash -c 'BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ] && [ \"$BRANCH\" != \"master\" ]; then git checkout main 2>/dev/null && git pull -q 2>/dev/null && git branch -d \"$BRANCH\" 2>/dev/null && git push origin --delete \"$BRANCH\" 2>/dev/null; git remote prune origin 2>/dev/null && echo \"{\\\"systemMessage\\\":\\\"Cleaned up: deleted local and remote branch $BRANCH\\\"}\"; else echo \"{}\"; fi'",
+            "timeout": 15,
+            "statusMessage": "Cleaning up merged branch..."
+          }
+        ]
+      }
+    ]
+  }
+}
