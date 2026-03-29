@@ -21,8 +21,10 @@ Generate a compressed summary of the current project's volatile state — the th
 - Do NOT assume directory names — discover them from the project
 
 ### 3. Shared UI Components (frontend only)
-- From the directory map, find where reusable/shared components live (could be `components/ui/`, `shared/components/`, `common/`, `lib/`, or any other structure)
-- For each component: extract the props interface/type (just the type definition, not the implementation)
+- **Don't rely on directory names.** A shared component is one imported by 3+ other files, regardless of where it lives.
+- Detection method: glob for all component files, then grep for import/require references to each. Components imported by 3+ files are shared.
+- If a directory like `shared/`, `common/`, `ui/`, or `lib/` exists, start there — but verify with import frequency. A flat structure with no such directory is equally valid.
+- For each shared component: extract the props interface/type (just the type definition, not the implementation)
 - Keep it concise — component name + props only
 
 ### 4. Data Models (backend only)
