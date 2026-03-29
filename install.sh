@@ -296,21 +296,38 @@ function Invoke-GitWithConfigSync {
     if ($args -and $args[0] -eq 'pull') {
         $configDir = "$HOME\Documents\Git\jkwon-claude-config"
         if (Test-Path "$configDir\.git") {
-            $before = & git.exe -C $configDir rev-parse HEAD 2>$null
-            & git.exe -C $configDir pull -q 2>$null
-            $after = & git.exe -C $configDir rev-parse HEAD 2>$null
-            if ($before -ne $after) {
-                $logs = & git.exe -C $configDir log --oneline "$before..$after" 2>$null
+            # Skip if config repo has uncommitted changes
+            $dirty = & git.exe -C $configDir status --porcelain 2>$null
+            if ($dirty) { return }
+            # Fetch latest from remote
+            & git.exe -C $configDir fetch -q 2>$null
+            # Compare local main to remote main (regardless of current branch)
+            $localMain = & git.exe -C $configDir rev-parse main 2>$null
+            $remoteMain = & git.exe -C $configDir rev-parse origin/main 2>$null
+            if ($localMain -eq $remoteMain) { return }
+            # Store current branch to restore later
+            $currentBranch = & git.exe -C $configDir rev-parse --abbrev-ref HEAD 2>$null
+            $wasOnMain = $currentBranch -eq "main"
+            if (-not $wasOnMain) {
+                & git.exe -C $configDir checkout main -q 2>$null
+            }
+            & git.exe -C $configDir pull --ff-only -q 2>$null
+            $after = & git.exe -C $configDir rev-parse main 2>$null
+            if ($localMain -ne $after) {
+                $logs = & git.exe -C $configDir log --oneline "$localMain..$after" 2>$null
                 $count = ($logs | Measure-Object).Count
                 Write-Host ""
                 Write-Host "Global Claude config updated and applied ($count change(s)):" -ForegroundColor Green
                 $logs | ForEach-Object { Write-Host "  $_" }
-                $changed = & git.exe -C $configDir diff --name-only "$before..$after" 2>$null
+                $changed = & git.exe -C $configDir diff --name-only "$localMain..$after" 2>$null
                 if ($changed -match "settings\.json|install\.sh|skills/") {
                     Write-Host "  Applying config changes..." -ForegroundColor DarkGray
                     & bash "$configDir/install.sh" 2>$null | Select-String "Symlinked|hooks|settings|MCP" | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
                 }
                 Write-Host ""
+            }
+            if (-not $wasOnMain) {
+                & git.exe -C $configDir checkout $currentBranch -q 2>$null
             }
         }
     }
@@ -347,20 +364,36 @@ git() {
   if [ "$1" = "pull" ]; then
     _claude_config_dir="$HOME/Documents/Git/jkwon-claude-config"
     if [ -d "$_claude_config_dir/.git" ]; then
-      _before=$(command git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
-      command git -C "$_claude_config_dir" pull -q 2>/dev/null
-      _after=$(command git -C "$_claude_config_dir" rev-parse HEAD 2>/dev/null)
-      if [ "$_before" != "$_after" ]; then
-        _count=$(command git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | wc -l | tr -d ' ')
+      # Skip if config repo has uncommitted changes
+      _dirty=$(command git -C "$_claude_config_dir" status --porcelain 2>/dev/null)
+      if [ -n "$_dirty" ]; then return; fi
+      # Fetch latest from remote
+      command git -C "$_claude_config_dir" fetch -q 2>/dev/null
+      # Compare local main to remote main (regardless of current branch)
+      _local_main=$(command git -C "$_claude_config_dir" rev-parse main 2>/dev/null)
+      _remote_main=$(command git -C "$_claude_config_dir" rev-parse origin/main 2>/dev/null)
+      if [ "$_local_main" = "$_remote_main" ]; then return; fi
+      # Store current branch to restore later
+      _current_branch=$(command git -C "$_claude_config_dir" rev-parse --abbrev-ref HEAD 2>/dev/null)
+      if [ "$_current_branch" != "main" ]; then
+        command git -C "$_claude_config_dir" checkout main -q 2>/dev/null
+      fi
+      command git -C "$_claude_config_dir" pull --ff-only -q 2>/dev/null
+      _after=$(command git -C "$_claude_config_dir" rev-parse main 2>/dev/null)
+      if [ "$_local_main" != "$_after" ]; then
+        _count=$(command git -C "$_claude_config_dir" log --oneline "$_local_main..$_after" 2>/dev/null | wc -l | tr -d ' ')
         echo ""
         echo "Global Claude config updated and applied ($_count change(s)):"
-        command git -C "$_claude_config_dir" log --oneline "$_before..$_after" 2>/dev/null | sed 's/^/  /'
-        _changed=$(command git -C "$_claude_config_dir" diff --name-only "$_before..$_after" 2>/dev/null)
+        command git -C "$_claude_config_dir" log --oneline "$_local_main..$_after" 2>/dev/null | sed 's/^/  /'
+        _changed=$(command git -C "$_claude_config_dir" diff --name-only "$_local_main..$_after" 2>/dev/null)
         if echo "$_changed" | grep -qE "settings\.json|install\.sh|skills/"; then
           echo "  Applying config changes..."
           bash "$_claude_config_dir/install.sh" 2>/dev/null | grep -E "Symlinked|hooks|settings|MCP" | sed 's/^/  /'
         fi
         echo ""
+      fi
+      if [ "$_current_branch" != "main" ]; then
+        command git -C "$_claude_config_dir" checkout "$_current_branch" -q 2>/dev/null
       fi
     fi
   fi
