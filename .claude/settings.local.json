@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(bash install.sh)",
+      "Bash(cd:*)",
+      "Bash(git remote:*)",
+      "Bash(mv /c/Users/jason/Documents/Git/agents /c/Users/jason/Documents/Git/jkwon-claude-config)",
+      "Read(//c/Users/jason/Documents/Git//**)",
+      "Read(//c/Users/jason/Documents/Git/**)",
+      "Bash(mv agents:*)",
+      "Bash(find:*)",
+      "Bash(gh secret:*)",
+      "Bash(where gh:*)",
+      "Read(//c/Users/jason/AppData/Local/Programs//**)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh pr:*)",
+      "Bash(winget list:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(winget install:*)",
+      "Bash(gh auth:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
