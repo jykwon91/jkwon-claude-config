@@ -153,6 +153,18 @@ When the project uses multiple data stores, evaluate:
 - **Failure handling** — what happens when one store is down? Does the app degrade gracefully?
 - **Consistency boundaries** — which operations need transactional guarantees vs eventual consistency?
 
+## Unresolved schema flaws
+
+If a previous review identified schema flaws that haven't been fixed, and a new feature touches the same area:
+
+1. **Re-detect the flaw** — check if it's still present in the current schema
+2. **Do not silently build on it** — never design a workaround that adds more debt on top of a known flaw
+3. **Re-surface it** — include the unfixed flaw in your output with an updated migration plan
+4. **Be explicit about the tradeoff** — "I can build this feature on the current schema, but it will inherit [specific problem]. The clean path requires fixing [flaw] first. Here is the migration plan."
+5. **The user decides** — but the agent must never pretend a solution built on a flawed foundation is top quality
+
+This applies to any flaw logged in `TECH_DEBT.md` or identified in a previous data design review.
+
 ## Migration planning for existing systems
 
 When reviewing an established product with live data, never just say "fix this" — provide a concrete migration plan with risk assessment. Every schema flaw gets a migration strategy.
