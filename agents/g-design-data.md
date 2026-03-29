@@ -19,18 +19,20 @@ Before evaluating anything, **read the project**. Do NOT assume any specific sta
 - Read any architecture docs, README, or ADR (Architecture Decision Records)
 
 ### 0b. Detect data stores from code
-Scan project files for connection strings, client imports, ORM configs, migration directories, and SDK references. Common patterns to look for:
 
-- **Relational DB** — any ORM (Entity Framework, SQLAlchemy, Django ORM, Prisma, ActiveRecord, Sequelize, GORM, Hibernate, Dapper) or raw SQL drivers
-- **Document DB** — MongoDB, Cosmos DB, DynamoDB, Firestore, CouchDB, RavenDB
-- **Cache** — Redis, Memcached, Azure Cache, NCache, in-memory caches
-- **Queue/Messaging** — Kafka, RabbitMQ, Azure Service Bus, Azure Queue Storage, SQS, Dramatiq, Celery, MassTransit, NServiceBus
-- **Search** — Elasticsearch, OpenSearch, Azure Cognitive Search, Algolia, Meilisearch
-- **File/Object storage** — S3, Azure Blob Storage, MinIO, Google Cloud Storage, local file storage
-- **Time-series** — InfluxDB, TimescaleDB, Azure Data Explorer
-- **Graph** — Neo4j, Azure Cosmos DB (Gremlin API), Amazon Neptune
+Read the project's dependency files (package.json, requirements.txt, *.csproj, go.mod, pom.xml, Gemfile, etc.) and configuration files to discover every data store and external service the project uses.
 
-Do NOT use hardcoded lists to detect these. Read the actual dependency files (package.json, requirements.txt, *.csproj, go.mod, pom.xml, etc.) and config files to discover what SDKs and clients are in use.
+Classify each by its role — not by its product name:
+
+- **Primary data store** — where the application's source of truth lives (relational, document, or otherwise)
+- **Cache layer** — any in-memory or distributed cache
+- **Message/event system** — queues, topics, event buses, streaming platforms
+- **Search** — full-text search or analytics engines
+- **File/object storage** — binary data, uploads, static assets
+- **Time-series** — metrics, logs, IoT, or temporal data
+- **Graph** — relationship-heavy data with traversal queries
+
+Do NOT maintain a hardcoded list of products or services. Read what the project actually imports and connects to. Any data store — whether managed cloud service, self-hosted, or in-house built — gets evaluated by the principles for its role, not its brand.
 
 ### 0c. Detect in-house libraries and abstractions
 Many projects wrap standard tools in custom abstractions. Look for:
@@ -41,24 +43,24 @@ Many projects wrap standard tools in custom abstractions. Look for:
 
 **Read these before evaluating data design.** The project may have conventions and constraints that override standard framework advice.
 
-### 0d. Detect cloud provider integration
-Look for SDK references and infrastructure-as-code (Terraform, Bicep, ARM templates, CloudFormation, Pulumi) to understand:
-- Which cloud provider's managed services are in use
-- How services are connected (VNETs, private endpoints, connection strings)
-- Any platform-specific constraints (Cosmos DB partition keys, DynamoDB capacity modes, Azure SQL DTU limits)
+### 0d. Detect cloud/infrastructure integration
+Look for SDK references and infrastructure-as-code (Terraform, Bicep, ARM templates, CloudFormation, CDK, Pulumi, Helm charts, Docker Compose) to understand:
+- Which managed services are in use and their configuration
+- How services are connected (networking, service discovery, connection strings)
+- Any platform-specific constraints (partition key design, capacity/throughput modes, instance size limits, region constraints)
 
 ### 0e. Build the data store inventory
 
+Classify by role, note the specific technology and how it's accessed:
+
 ```
 Data stores detected:
-- Azure SQL (primary, via Entity Framework Core)
-- Azure Cosmos DB (document store, via Microsoft.Azure.Cosmos SDK)
-- Azure Cache for Redis (caching, via StackExchange.Redis)
-- Azure Service Bus (messaging, via Azure.Messaging.ServiceBus)
-- Azure Blob Storage (files, via Azure.Storage.Blobs)
+- Primary DB: [technology] (via [ORM/driver])
+- Cache: [technology] (via [client library])
+- Messaging: [technology] (via [SDK/abstraction])
+- File storage: [technology] (via [SDK])
 In-house libraries:
-- Contoso.Data.Abstractions (custom repository base class, wraps EF Core)
-- Contoso.Messaging (custom message bus abstraction over Service Bus)
+- [package name] (what it wraps and what conventions it enforces)
 ```
 
 ## When reviewing proposed changes
@@ -71,7 +73,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 
 ## What to evaluate — per data store type
 
-### Relational databases (PostgreSQL, MySQL, SQLite, SQL Server)
+### Relational databases
 
 **Schema structure:**
 - Normalization — every fact stored once, in one place. Flag field duplication across related tables.
@@ -102,7 +104,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - Row-level security (tenant/user filtering) applied consistently
 - Bulk operations use SQL UPDATE/DELETE, not ORM loops
 
-### Document databases (MongoDB, DynamoDB, Firestore, CouchDB)
+### Document databases
 
 **Document structure:**
 - Access pattern driven — design documents around how they're read, not how they're related
@@ -121,7 +123,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - Denormalization strategy documented — when data is duplicated, how are updates propagated?
 - Atomic operations used where available (findAndModify, transactions)
 
-### Cache (Redis, Memcached)
+### Cache
 
 **Key design:**
 - Consistent key naming convention (namespace:entity:id)
@@ -137,7 +139,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - Memory limits configured
 - Eviction policy appropriate for the use case (LRU, LFU, TTL-based)
 
-### Queue/Messaging (Kafka, RabbitMQ, SQS, Azure Queue, Dramatiq)
+### Queue/Messaging
 
 **Message schema:**
 - Messages have a defined schema (not arbitrary dicts)
@@ -155,7 +157,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - Timeouts and retry logic with backoff
 - Consumer failures don't block the queue
 
-### Search (Elasticsearch, OpenSearch)
+### Search
 
 **Mapping design:**
 - Field types explicit (not relying on dynamic mapping)
@@ -166,7 +168,7 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - How is the search index kept in sync with the source of truth?
 - Reindex strategy defined
 
-### File/Object storage (S3, Azure Blob, MinIO)
+### File/Object storage
 
 **Key design:**
 - Key patterns support listing/filtering operations needed
@@ -243,7 +245,7 @@ If a direct schema change would cause unacceptable downtime, use one of these pa
 
 1. **Expand-contract migration** — add nullable column → backfill in batches → switch code → add constraint → drop old. Each step is non-blocking. Works with any relational DB.
 2. **Shadow table** — create new table → dual-write → backfill → switch reads → drop old. Zero downtime.
-3. **Online schema migration tools** — use the right tool for the stack (e.g., `pg_repack`/`pgroll` for PostgreSQL, `gh-ost`/`pt-online-schema-change` for MySQL, SSDT/EF migrations for SQL Server, Atlas for multi-DB). Read the project's migration tooling before recommending.
+3. **Online schema migration tools** — use the right tool for the project's stack. Read the project's existing migration tooling and recommend tools compatible with it. Do not hardcode tool recommendations.
 4. **Feature-flagged code** — deploy code supporting both schemas behind a flag → run migration → flip flag. Rollback = flip back.
 5. **Blue-green data migration** — for document stores and NoSQL: deploy new schema version alongside old, migrate reads first, then writes, then drop old. Cosmos DB, DynamoDB, and MongoDB all support schema versioning at the document level.
 
