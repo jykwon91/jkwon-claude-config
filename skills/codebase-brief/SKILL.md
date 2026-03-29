@@ -21,9 +21,8 @@ Generate a compressed summary of the current project's volatile state — the th
 - Do NOT assume directory names — discover them from the project
 
 ### 3. Shared UI Components (frontend only)
-- **Don't rely on directory names.** A shared component is one imported by 3+ other files, regardless of where it lives.
-- Detection method: glob for all component files, then grep for import/require references to each. Components imported by 3+ files are shared.
-- If a directory like `shared/`, `common/`, `ui/`, or `lib/` exists, start there — but verify with import frequency. A flat structure with no such directory is equally valid.
+- CLAUDE.md or the directory map will make it obvious where shared components live — read those files
+- **Fallback for flat structures:** if no clear shared directory exists, grep for the most-imported component files (imported by 3+ other files) to identify reusable ones
 - For each shared component: extract the props interface/type (just the type definition, not the implementation)
 - Keep it concise — component name + props only
 
