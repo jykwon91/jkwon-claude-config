@@ -66,3 +66,4 @@
 - Always write and run E2E tests for every new feature before committing — tests must cover the full user flow (form submission, API interaction, state changes, error handling), not just rendering or visibility checks.
 - Always run database migrations immediately after creating or modifying migration files — never leave migrations unapplied, as the running dev server will crash on the next request that touches new or altered columns.
 - Never skip pipeline steps (design agents, test-writer, code-reviewer, pre-commit) for any reason — if completing the full pipeline isn't possible in the current session, pause and continue in the next session rather than cutting corners.
+- Delegate volatile codebase reads (component APIs, schemas, route lists, test patterns) to focused Explore subagents instead of reading files individually in the main context — reserve main-context file reads for files that need to be edited.
