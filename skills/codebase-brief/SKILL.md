@@ -8,54 +8,54 @@ allowed-tools: Read, Grep, Glob, Bash
 
 Generate a compressed summary of the current project's volatile state — the things that change between sessions and can't be reliably stored in memory. This replaces reading 10-15 individual files in the main context.
 
+## Discovery strategy
+
+For every section below, follow this fallback chain. Stop at the first level that gives a clear answer:
+
+1. **CLAUDE.md** — read it first. If it documents where things live, use that.
+2. **Directory structure** — `ls` / glob the project. If directory names make the purpose obvious, use that.
+3. **Code analysis** — grep for imports, decorators, or patterns to derive what the structure doesn't make clear.
+
 ## What to detect
 
-### 1. Tech Stack (from project files)
-- Read `CLAUDE.md` first — it documents the stack and conventions
-- Detect from `package.json`, `requirements.txt`, `pyproject.toml`, `*.csproj`, `go.mod`, etc.
+### 1. Tech Stack
+- CLAUDE.md usually documents this
+- Fallback: detect from `package.json`, `requirements.txt`, `pyproject.toml`, `*.csproj`, `go.mod`, etc.
 - Note: framework, ORM, test framework, styling, state management, data fetching library
 
-### 2. Directory Map
-- Run `ls` or glob on the project root and key subdirectories to discover the actual structure
-- Identify which directories contain: components, models/entities, routes/controllers, services, store/state, tests
-- Do NOT assume directory names — discover them from the project
+### 2. Shared UI Components (frontend only)
+- **CLAUDE.md** — check if it documents where shared components live
+- **Directory structure** — look for directories whose names suggest reusability (`shared/`, `common/`, `ui/`, `lib/`, `components/`)
+- **Import frequency** — if the structure is flat or ambiguous, grep for component files imported by 3+ other files
+- For each: extract the props interface/type only (not implementation)
 
-### 3. Shared UI Components (frontend only)
-- CLAUDE.md or the directory map will make it obvious where shared components live — read those files
-- **Fallback for flat structures:** if no clear shared directory exists, grep for the most-imported component files (imported by 3+ other files) to identify reusable ones
-- For each shared component: extract the props interface/type (just the type definition, not the implementation)
-- Keep it concise — component name + props only
+### 3. Data Models (backend only)
+- **CLAUDE.md** — check if it documents where models live
+- **Directory structure** — look for `models/`, `entities/`, `domain/`, `schema/`
+- **Code analysis** — grep for ORM base class inheritance or decorator patterns (e.g., `class.*Base`, `@Entity`, `type.*struct`)
+- For each: list field names and types. Note relationships.
 
-### 4. Data Models (backend only)
-- From the directory map, find where models/entities are defined (could be `models/`, `entities/`, `domain/`, `schema/`, or any other structure)
-- For each model: list field names and types (just the schema, not methods)
-- Note relationships between models
+### 4. API Routes
+- **CLAUDE.md** — check if it documents route structure
+- **Directory structure** — look for `routes/`, `api/`, `controllers/`, `handlers/`
+- **Code analysis** — grep for route decorators (`@router`, `@app.`, `[HttpGet]`, `r.GET`, `router.get`, `@Controller`)
+- List: HTTP method, path, brief purpose. Group by resource.
 
-### 5. API Routes
-- From the directory map, find where routes/controllers are defined
-- Grep for route decorators or endpoint definitions (e.g., `@router`, `@app.`, `[HttpGet]`, `r.GET`, `router.get`)
-- List: HTTP method, path, brief purpose
-- Group by resource/domain
+### 5. Store/State Management (frontend only)
+- **CLAUDE.md** — check if it documents state management approach
+- **Directory structure** — look for `store/`, `state/`, `api/`, `queries/`, `composables/`
+- **Code analysis** — grep for data fetching patterns (`createApi`, `useQuery`, `defineStore`, `createSlice`)
+- List existing query/mutation hooks and their endpoints.
 
-### 6. Store/State Management (frontend only)
-- From the directory map, find where data fetching/state is defined
-- Identify the pattern (RTK Query, React Query, SWR, Pinia, Vuex, NgRx, Zustand, etc.)
-- List existing query/mutation hooks and their endpoints
-- Note the pattern for adding new endpoints
+### 6. Test Patterns
+- **CLAUDE.md** — check if it documents test conventions
+- **Directory structure** — look for `tests/`, `__tests__/`, `spec/`, `e2e/`, `*.test.*`, `*.spec.*`
+- **Code analysis** — read 1 backend test and 1 frontend test to extract: framework, mocking approach, fixture patterns, naming convention
 
-### 7. Test Patterns
-- From the directory map, find where tests live
-- Read 1 backend test and 1 frontend test to extract:
-  - Test framework and assertion style
-  - Mocking approach (how are APIs/DB mocked?)
-  - Fixture patterns
-  - File naming convention
-
-### 8. Naming Conventions
-- Observe from discovered files (don't assume):
-  - File naming (kebab-case, PascalCase, snake_case)
-  - Directory structure pattern (by feature? by type?)
-  - Import style (absolute paths, aliases, relative)
+### 7. Naming Conventions
+- **CLAUDE.md** — check if it documents conventions
+- **Directory structure** — observe file naming patterns from discovered files
+- **Code analysis** — observe import style (absolute paths, aliases, relative) from a few files
 
 ## Output format
 
