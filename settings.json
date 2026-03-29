@@ -21,7 +21,7 @@
           {
             "type": "command",
             "if": "Bash(gh pr merge:*)",
-            "command": "bash -c 'BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ] && [ \"$BRANCH\" != \"master\" ]; then git checkout main 2>/dev/null && git pull -q 2>/dev/null && git branch -d \"$BRANCH\" 2>/dev/null && git remote prune origin 2>/dev/null && echo \"{\\\"systemMessage\\\":\\\"Cleaned up: deleted branch $BRANCH and pruned remotes\\\"}\"; else echo \"{}\"; fi'",
+            "command": "bash -c 'BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ] && [ \"$BRANCH\" != \"master\" ]; then git checkout main 2>/dev/null && git pull -q 2>/dev/null && git branch -d \"$BRANCH\" 2>/dev/null && git push origin --delete \"$BRANCH\" 2>/dev/null; git remote prune origin 2>/dev/null && echo \"{\\\"systemMessage\\\":\\\"Cleaned up: deleted local and remote branch $BRANCH\\\"}\"; else echo \"{}\"; fi'",
             "timeout": 15,
             "statusMessage": "Cleaning up merged branch..."
           }
