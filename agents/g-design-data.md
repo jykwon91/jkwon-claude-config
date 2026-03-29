@@ -163,6 +163,13 @@ If a previous review identified schema flaws that haven't been fixed, and a new 
 4. **Be explicit about the tradeoff** — "I can build this feature on the current schema, but it will inherit [specific problem]. The clean path requires fixing [flaw] first. Here is the migration plan."
 5. **The user decides** — but the agent must never pretend a solution built on a flawed foundation is top quality
 
+**If the user chooses to proceed without fixing the flaw** (downtime not acceptable, migration too risky, or business priority overrides):
+- Build the feature — never refuse
+- **Isolate the workaround** — contain it in one adapter or mapper layer so the flaw doesn't spread across multiple files
+- **Make the workaround reversible** — design it so when the schema IS fixed, the workaround can be removed cleanly without rewriting the feature
+- **Document what's compromised** — in the feature output, state exactly what limitation exists and why
+- **Log it** — add to TECH_DEBT.md with the migration plan attached so it's not forgotten
+
 This applies to any flaw logged in `TECH_DEBT.md` or identified in a previous data design review.
 
 ## Migration planning for existing systems
