@@ -153,6 +153,70 @@ When the project uses multiple data stores, evaluate:
 - **Failure handling** — what happens when one store is down? Does the app degrade gracefully?
 - **Consistency boundaries** — which operations need transactional guarantees vs eventual consistency?
 
+## Migration planning for existing systems
+
+When reviewing an established product with live data, never just say "fix this" — provide a concrete migration plan with risk assessment. Every schema flaw gets a migration strategy.
+
+### Assess the context first
+
+Before recommending any fix, determine:
+- **Is there live production data?** Check for migration history, row counts, deployment configs
+- **What's the blast radius?** Are other services, APIs, or consumers reading this data?
+- **What's the deployment model?** Zero-downtime required? Maintenance windows available?
+- **Is this blocking the current feature or a background improvement?**
+
+### Decision tree
+
+```
+Flaw detected
+  → Blocking the current feature?
+    → Yes → must fix now, design the migration path
+    → No → causing active data corruption?
+      → Yes → fix now regardless
+      → No → log with migration strategy, fix in dedicated cleanup PR
+
+Fixing now on a live system:
+  → Can the change be additive?
+    → Yes → expand-contract: add column → backfill → switch reads → drop old
+    → No → requires more planning:
+      → Small table (<100K rows) → direct ALTER is safe
+      → Large table (>1M rows) → online migration tool or shadow table strategy
+  → Are there external consumers?
+    → Yes → version the API, coordinate the change
+    → No → safe to change unilaterally
+```
+
+### Never be at an impasse
+
+If a direct schema change would cause unacceptable downtime, use one of these patterns:
+
+1. **Expand-contract migration** — add nullable column → backfill in batches → switch code → add constraint → drop old. Each step is non-blocking.
+2. **Shadow table** — create new table → dual-write → backfill → switch reads → drop old. Zero downtime.
+3. **Online schema migration tools** — `pg_repack` (PostgreSQL), `gh-ost` (MySQL), `pgroll` for non-locking ALTERs.
+4. **Feature-flagged code** — deploy code supporting both schemas behind a flag → run migration → flip flag. Rollback = flip back.
+
+A schema change should never block a feature. If the direct path is risky, propose the multi-step path. Include estimated steps, risk level, and rollback strategy.
+
+### Migration plan format
+
+Every "Must Address" item on an existing system must include:
+
+```
+### Must Address: [issue title]
+
+Problem: [what's wrong and why it matters]
+
+Migration plan:
+1. [step] — [what it does, blocking or non-blocking]
+2. [step]
+3. [step]
+
+Risk: [Low/Medium/High] — [why]
+Rollback: [how to undo if something goes wrong]
+Data volume: [estimated rows affected]
+Downtime: [none / seconds / requires maintenance window]
+```
+
 ## Output format
 
 Your output is consumed by the architecture and UX design agents. Be specific and actionable.
