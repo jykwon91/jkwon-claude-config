@@ -335,7 +335,11 @@ function Invoke-GitWithConfigSync {
                 $changed = & git.exe -C $configDir diff --name-only "$localMain..$after" 2>$null
                 if ($changed -match "settings\.json|install\.sh|skills/") {
                     Write-Host "  Applying config changes..." -ForegroundColor DarkGray
-                    & bash "$configDir/install.sh" 2>$null | Select-String "Symlinked|hooks|settings|MCP" | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+                    $bashExe = "${env:ProgramFiles}\Git\bin\bash.exe"
+                    if (-not (Test-Path $bashExe)) { $bashExe = "${env:ProgramFiles(x86)}\Git\bin\bash.exe" }
+                    if (Test-Path $bashExe) {
+                        & $bashExe "$configDir/install.sh" 2>$null | Select-String "Symlinked|hooks|settings|MCP" | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+                    }
                 }
                 Write-Host ""
                 Write-Host "  To disable: `$env:CLAUDE_CONFIG_SYNC = '0'" -ForegroundColor DarkGray
