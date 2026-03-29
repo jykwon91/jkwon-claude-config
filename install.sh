@@ -299,8 +299,18 @@ function Invoke-GitWithConfigSync {
             # Skip if config repo has uncommitted changes
             $dirty = & git.exe -C $configDir status --porcelain 2>$null
             if ($dirty) { return }
-            # Fetch latest from remote
-            & git.exe -C $configDir fetch -q 2>$null
+            # Fetch with 5 second timeout — never block the user
+            $fetchJob = Start-Job -ScriptBlock {
+                param($dir)
+                & git.exe -C $dir fetch -q 2>$null
+            } -ArgumentList $configDir
+            $completed = Wait-Job $fetchJob -Timeout 5
+            if (-not $completed) {
+                Stop-Job $fetchJob
+                Remove-Job $fetchJob -Force
+                return
+            }
+            Remove-Job $fetchJob -Force
             # Compare local main to remote main (regardless of current branch)
             $localMain = & git.exe -C $configDir rev-parse main 2>$null
             $remoteMain = & git.exe -C $configDir rev-parse origin/main 2>$null
@@ -367,8 +377,12 @@ git() {
       # Skip if config repo has uncommitted changes
       _dirty=$(command git -C "$_claude_config_dir" status --porcelain 2>/dev/null)
       if [ -n "$_dirty" ]; then return; fi
-      # Fetch latest from remote
-      command git -C "$_claude_config_dir" fetch -q 2>/dev/null
+      # Fetch with 5 second timeout — never block the user
+      if command -v timeout &>/dev/null; then
+        timeout 5 command git -C "$_claude_config_dir" fetch -q 2>/dev/null || return
+      else
+        command git -C "$_claude_config_dir" fetch -q 2>/dev/null
+      fi
       # Compare local main to remote main (regardless of current branch)
       _local_main=$(command git -C "$_claude_config_dir" rev-parse main 2>/dev/null)
       _remote_main=$(command git -C "$_claude_config_dir" rev-parse origin/main 2>/dev/null)
