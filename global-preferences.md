@@ -30,7 +30,7 @@
 - Always include tests in the same commit as the code change — never commit logic without corresponding tests, then add tests as a follow-up. Tests are part of the deliverable, not a separate step.
 - E2E tests are regression contracts — when a test fails, the code is broken, not the test. Fix the code to make the test pass. Never change a test just to satisfy broken code. Only update tests when feature requirements explicitly change.
 - Always include E2E layout tests when adding new pages or modifying page layouts.
-- Always write E2E tests that simulate real user interactions (fill forms, click buttons, submit, verify outcomes) — never write tests that only check if elements are visible or rendered.
+- Always write E2E tests that exercise real user flows end-to-end — create test data via API or UI, perform the action being tested, verify the outcome in the UI and database state, then clean up test data. Never write E2E tests that only check if elements are visible or rendered — those are layout tests, not behavioral tests.
 - Always write E2E tests that verify skeleton loading states match the loaded page structure — same sections, same grid columns, same element count.
 
 ### Security
