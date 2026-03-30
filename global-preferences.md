@@ -21,7 +21,7 @@
 - Structure projects logically — group files by feature or domain, not by file type, so related code lives together.
 - Prefer pure functions — functions with no side effects and deterministic output — unless state or side effects are required.
 - Follow layered architecture — route/controller handlers should be thin wrappers that delegate to services; services contain business logic; repositories or data-access modules handle all database operations.
-- Never import database or ORM primitives in route handlers — data access belongs in the service or repository layer.
+- Never import database or ORM primitives in route handlers or service files — all data access must go through repository functions. If a repository function doesn't exist for the query you need, create it first. Violations of layered architecture are bugs, not tech debt to address later.
 - Extract data mapping and conversion logic into dedicated mapper modules — services orchestrate (load, decide, persist), mappers convert (raw data → model). Never duplicate model construction logic across multiple files.
 - All imports belong at the top of the file — never inside functions or methods. If a circular import occurs, fix the architecture (break the cycle by restructuring modules), don't hide it with a lazy import.
 - Before writing a custom solution, research whether a well-supported, well-maintained library already solves the problem. Suggest it as an option if it fits the exact requirement and doesn't significantly increase project overhead.
@@ -71,3 +71,4 @@
 - Never skip pipeline steps (design agents, test-writer, code-reviewer, pre-commit) for any reason — if completing the full pipeline isn't possible in the current session, pause and continue in the next session rather than cutting corners.
 - Delegate volatile codebase reads (component APIs, schemas, route lists, test patterns) to focused Explore subagents instead of reading files individually in the main context — reserve main-context file reads for files that need to be edited.
 - Never acknowledge a code quality issue, standards violation, or missing test without fixing it in the same session — if you identify something broken, fix it before committing. If the fix is too large for the current PR, create a separate branch and complete it in the same session.
+- Never mark an audit item as resolved without verifying zero remaining violations — after fixing, re-run the same scan (grep, lint, test) to confirm the count is zero. Report exact file counts with file names, not estimates. If you can't fix all violations in one pass, leave the item open with the remaining count and file list.
