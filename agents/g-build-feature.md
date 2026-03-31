@@ -94,6 +94,35 @@ Conditionally run:
 
 Synthesize the design agent outputs into a coherent implementation plan. If agents disagree, prefer the recommendation that gives the best end-user experience — but never override data design decisions without justification, since they are foundational.
 
+### Step 2.5: Page Spec (REQUIRED if the feature adds or redesigns a UI page)
+
+Before writing any code for a page feature, produce a **Page Spec** that synthesizes the design outputs into a verifiable contract. This step prevents UX reversals (adding then removing elements) and navigation bugs.
+
+**The page spec must include:**
+
+1. **Information Hierarchy** — every data point the page will display, with justification:
+   ```
+   | Data point | Justification | Source |
+   |------------|--------------|--------|
+   | Document name | Primary identifier — user clicks to navigate | document.name |
+   | Form count | Helps user assess completeness | COUNT(forms) |
+   | Key amounts | EXCLUDED — not actionable on navigation page | — |
+   ```
+
+2. **Navigation Flow** — URL state plan and back button contract:
+   ```
+   URL params: ?tab=forms&form=schedule_e
+   Navigation depth:
+     List page → Detail page (push history)
+       → Tab selection (replace history, update ?tab=)
+         → Form drilldown (replace history, update ?form=)
+   Back button: drilldown → tab view → detail page → list page
+   ```
+
+3. **States** — loading, empty, error for each section (from g-design-ux output)
+
+**This spec is the contract.** Post-implementation, the validation pipeline checks the implementation matches it. If a data point isn't in the spec, it shouldn't be in the code.
+
 ### Step 3: Implement
 
 Build the feature based on the approved designs. Follow this order:

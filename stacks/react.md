@@ -20,6 +20,13 @@ Apply these patterns when the project uses React. Detect React from `package.jso
 - URL state (filters, pagination, tabs) belongs in the URL via search params — not in component state.
 - Ephemeral UI state (hover, open/closed) is the only thing that belongs in local useState.
 
+## CRITICAL — Navigation State Planning
+
+- For any page with sub-views, tabs, drilldowns, or multi-step flows: plan URL state, back button behavior, and deep-link support before implementing. Navigation is designed, not discovered after implementation.
+- Every selectable view (tab, form, detail panel) must be represented in the URL — store active tab, selected item, and view mode in search params so browser back/forward works correctly and URLs are shareable.
+- Plan the back button contract for every navigation depth: clicking back from a drilldown returns to the parent view (not the previous page in browser history). Test back button behavior explicitly in E2E tests.
+- If a page has more than one level of navigation depth (e.g., list → detail → sub-detail), draw out the navigation stack before coding: which transitions push history entries and which replace them.
+
 ## CRITICAL — Eliminating Waterfalls
 
 - Defer `await` until the point where the result is actually used, not at the top of the function.

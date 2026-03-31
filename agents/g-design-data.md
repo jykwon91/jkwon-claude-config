@@ -178,6 +178,38 @@ Scan all data store configurations, models, schemas, query patterns, and cross-s
 - Retention/cleanup policy defined
 - Orphaned files cleaned up when source records are deleted
 
+## Uniqueness & deduplication (REQUIRED when feature involves matching, dedup, or uniqueness constraints)
+
+When the feature involves any entity-matching logic, deduplication, or uniqueness constraints, you MUST produce a **Dedup Matrix** that enumerates all edge cases before the feature is implemented. This section is mandatory — skipping it is how dedup bugs recur across multiple PRs.
+
+### What to evaluate
+
+For every uniqueness constraint, composite key, or matching rule:
+
+1. **Define the composite key explicitly** — which fields determine "same entity"? (e.g., form_type + EIN + document_id, not just form_type + EIN)
+2. **Enumerate all combinations:**
+   - Same entity, same source (true duplicate — should be deduped)
+   - Same entity, different sources (may be legitimate — e.g., same EIN from two different documents)
+   - Different entities sharing partial keys (not duplicates — e.g., different form types from same issuer)
+   - Same entity re-processed (idempotency — re-extraction should update, not create duplicates)
+3. **State the expected behavior** for each combination (merge, reject, allow, update)
+4. **Identify the test cases** that must exist before implementation
+
+### Dedup Matrix format (include in output)
+
+```
+### Dedup Matrix: [entity name]
+
+Composite key: [field1 + field2 + ...]
+
+| Scenario | field1 | field2 | ... | Expected behavior |
+|----------|--------|--------|-----|-------------------|
+| True duplicate | same | same | same | Deduplicate |
+| Same entity, different source | same | same | different | Allow both |
+| Partial key overlap | same | different | — | Allow both |
+| Re-processed entity | same | same | same | Update existing |
+```
+
 ## Cross-store consistency
 
 When the project uses multiple data stores, evaluate:
@@ -295,6 +327,9 @@ Your output is consumed by the architecture and UX design agents. Be specific an
 
 ### Recommendations for UX Agent
 - [data decisions that affect what the UI can display, loading patterns, real-time vs polling]
+
+### Dedup Matrix (REQUIRED if feature involves matching/uniqueness/dedup)
+- [see Uniqueness & deduplication section above for format]
 
 ### Suggested Agent Update (if applicable)
 - [pattern] What this agent should check for in the future and why
