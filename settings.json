@@ -6,10 +6,24 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "bash -c 'BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"Cannot commit directly to main. Create a feature branch first.\\\"}\"; fi'",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
             "if": "Bash(git push:*)",
             "command": "py -c \"import sys,json,subprocess;data=json.load(sys.stdin);branch=subprocess.run(['git','rev-parse','--abbrev-ref','HEAD'],capture_output=True,text=True).stdout.strip();state=subprocess.run(['gh','pr','view',branch,'--json','state','--jq','.state'],capture_output=True,text=True).stdout.strip() if branch and branch not in('main','master') else '';print(json.dumps({'decision':'block','reason':f'PR for branch {branch} is already MERGED. Create a new branch and cherry-pick your commits.'})) if state=='MERGED' else print('{}')\"",
             "timeout": 10,
             "statusMessage": "Checking if PR is already merged..."
+          },
+          {
+            "type": "agent",
+            "if": "Bash(gh pr create*)",
+            "prompt": "You are a pipeline quality gate. Your job is to BLOCK the PR if quality standards are not met. Review the current branch against main and check ALL of the following. If ANY check fails, respond with a JSON object: {\"decision\": \"block\", \"reason\": \"<specific failure>\"}\n\nChecks:\n\n1. **E2E tests exist for new features**: Run `git diff --name-only main...HEAD` to see changed files. If any new pages, API endpoints, or user-facing features were added (check for new route files, page components, or API handlers), there MUST be corresponding new or modified E2E test files (*.spec.ts in e2e/). If no E2E tests exist for new features, BLOCK.\n\n2. **E2E tests are meaningful**: Read each new/modified E2E test file. Every test MUST: (a) create test data via API or UI, (b) perform a user action, (c) verify the outcome, (d) clean up test data. If any test only checks visibility/rendering without creating data and testing flows, BLOCK with the specific test name and what it's missing.\n\n3. **No ORM in services or routes**: Run `grep -r 'db.add\\|db.flush\\|db.commit\\|db.execute' --include='*.py'` on changed files in services/ and api/ directories. If any service file directly uses db.add/flush/commit/execute, BLOCK. Only repository files may use these.\n\n4. **No inline components**: Run `grep -n 'function.*{' --include='*.tsx'` on changed frontend files. If any file defines more than one exported or named function component, BLOCK.\n\n5. **Strict typing**: Run `grep -n ': any\\|as any' --include='*.ts' --include='*.tsx'` on changed files. If any `any` type usage is found, BLOCK.\n\n6. **Pre-commit review was addressed**: Check git log for evidence that review findings were fixed (look for commits mentioning 'pre-commit', 'review', or 'fix' after the initial feature commit). If the branch has only one commit and it's a large feature, WARN that pre-commit review may not have been run.\n\nIf ALL checks pass, respond with an empty JSON object: {}\n\nBe strict. The purpose of this gate is to prevent shortcuts. Do not make exceptions.",
+            "timeout": 120,
+            "model": "claude-haiku-4-5-20251001",
+            "statusMessage": "Pipeline quality gate — checking E2E tests, architecture, and standards..."
           }
         ]
       }
