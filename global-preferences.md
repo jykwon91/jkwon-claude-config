@@ -32,6 +32,7 @@
 - Always include E2E layout tests when adding new pages or modifying page layouts.
 - Always write E2E tests that exercise real user flows end-to-end — create test data via API or UI, perform the action being tested, verify the outcome in the UI and database state, then clean up test data. Never write E2E tests that only check if elements are visible or rendered — those are layout tests, not behavioral tests.
 - Always write E2E tests that verify skeleton loading states match the loaded page structure — same sections, same grid columns, same element count.
+- For any uniqueness constraint, deduplication logic, or entity-matching rule: enumerate and test all composite key combinations before implementation — same entity from same source, same entity from different sources, different entities sharing partial keys (e.g., same EIN but different documents). Never assume the obvious case is the only case.
 
 ### Security
 - Never hardcode secrets or API keys in source files — always use environment variables. Committing `.env` files with dev/dummy values is acceptable.
@@ -46,6 +47,7 @@
 - Always design UI components and pages with mobile-first responsiveness — ensure touch targets are at least 44x44px, layouts work on small screens, data tables have responsive column visibility or card alternatives, and interactive elements support touch events alongside mouse events.
 - Never block the UI or API responsiveness with background work — offload long-running tasks so users can continue interacting with the application.
 - Always provide visible feedback for every user action — show progress during operations, confirm success on completion, and display clear error messages on failure. Never leave the user wondering if something happened.
+- Before building or redesigning any page, define the information hierarchy — list every data point the page will display and justify its presence. If a data point isn't actionable on this page, it doesn't belong. Remove before adding. UX reversals (adding then removing elements) indicate the hierarchy wasn't validated before implementation.
 
 ### Data Integrity
 - Always inspect actual data before fixing bugs — query the database, check API responses, examine extraction output. Never assume what the data looks like.
@@ -61,7 +63,7 @@
 - Always run the QA generator (`g-qa`) on first use in a new project to create a domain-specific QA agent tailored to that project's tech stack and data types. Then run the generated QA agent after implementing features to write and run tests.
 - Always run the pre-commit review agent (`g-pre-commit`) before committing code changes to catch security issues, logic errors, and performance problems early.
 - Always run design agents (UX, architecture, data) before implementing features — design agents are solutioning partners, not post-implementation reviewers.
-- Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch.
+- Always create a new git branch for each feature or PR — never push multiple unrelated changes to the same branch. Maximum one user-facing feature per PR — multi-feature PRs make regressions impossible to isolate and reviews impossible to focus. If planning multiple features, implement and merge each separately.
 - Always merge existing feature branches to main before starting new work — check `git branch --no-merged main` at the start of every session and create PRs for any unmerged branches first.
 - When a user corrects a mistake, don't just fix it — identify the root cause and create a systemic fix (test, preference, or workflow change) so the same mistake never reaches the user again.
 - Never create a new PR on the shared config repo (jkwon-claude-config) if one already exists — push additional changes to the existing open PR branch to avoid stale conflicts.
@@ -71,5 +73,6 @@
 - Never skip pipeline steps (design agents, test-writer, code-reviewer, pre-commit) for any reason — if completing the full pipeline isn't possible in the current session, pause and continue in the next session rather than cutting corners.
 - Delegate volatile codebase reads (component APIs, schemas, route lists, test patterns) to focused Explore subagents instead of reading files individually in the main context — reserve main-context file reads for files that need to be edited.
 - Never acknowledge a code quality issue, standards violation, or missing test without fixing it in the same session — if you identify something broken, fix it before committing. If the fix is too large for the current PR, create a separate branch and complete it in the same session.
+- Code review runs per-PR, never retroactively across multiple PRs. Every PR must pass review independently before merging. If a retroactive review finds issues across prior PRs, that's a signal to strengthen the per-PR review agents, not to batch reviews later.
 - Never mark an audit item as resolved without verifying zero remaining violations — after fixing, re-run the same scan (grep, lint, test) to confirm the count is zero. Report exact file counts with file names, not estimates. If you can't fix all violations in one pass, leave the item open with the remaining count and file list.
 - Never leave test data in a dev or production database — if tests insert records via API or direct DB access, the teardown must delete them. Always verify no test artifacts remain after running tests or agents that touch live databases.

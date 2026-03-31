@@ -87,6 +87,19 @@ Before recommending a custom UI component, interaction pattern, or frontend util
 - Are error boundaries wrapping feature sections so one failure doesn't crash the whole page?
 - Is the tab order logical and do interactive elements have visible focus indicators?
 
+### Navigation state (REQUIRED for any page with sub-views, tabs, or drilldowns)
+- Is every selectable view represented in the URL via search params (active tab, selected item, view mode)?
+- Does browser back/forward navigate between views correctly — not leave the page?
+- Does the back button from a drilldown return to the parent view?
+- If the page has multiple navigation depths: which transitions push history entries vs replace them?
+- Can every meaningful view state be reached via direct URL (deep-linkable)?
+
+### Information hierarchy (REQUIRED for new pages or page redesigns)
+- Is every displayed data point justified — actionable on this specific page, not just "nice to have"?
+- Are navigation-focused pages kept lean (links, counts, status) vs detail pages which show full data?
+- Would removing any displayed element reduce the user's ability to complete their task? If not, remove it.
+- Are data points that belong on a detail page kept off summary/navigation pages?
+
 ## Self-improvement
 
 If during your review you notice a recurring pattern or important check that is NOT already covered in this agent's instructions, include it in your output under a **Suggested Agent Update** section.
@@ -95,6 +108,15 @@ If during your review you notice a recurring pattern or important check that is 
 
 ```
 ## UX Review
+
+### Navigation Flow Plan (REQUIRED if feature has sub-views/tabs/drilldowns)
+- URL state: [which params store which view state]
+- Back button contract: [what back does at each depth]
+- Deep-link support: [which views are directly addressable]
+
+### Information Hierarchy (REQUIRED if feature adds/redesigns a page)
+- [data point] — [justification: why it belongs on this page]
+- [data point] — REMOVE: [reason it doesn't belong here]
 
 ### Must Fix
 - [component/flow] What the user experiences and why it's a problem

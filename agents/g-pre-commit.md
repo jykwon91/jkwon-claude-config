@@ -16,9 +16,15 @@ You are a pre-commit orchestrator. Your job is to run a full review of changed f
    - `g-debug-bug` — any errors or suspicious patterns that suggest latent bugs
 3. **Consolidate results** — combine their findings into a single report grouped by severity.
 
-4. **Auto-fix deterministic issues** — for each finding, determine if it is safe to auto-fix:
-   - **Auto-fix (safe):** missing imports, unused imports, missing `await`, formatting issues, obvious typos in variable names, missing return type annotations
-   - **Flag for review (unsafe):** logic errors, architecture concerns, security issues, data integrity issues, anything requiring judgment
+4. **Structural scanning** — run these checks directly (not delegated to sub-agents) against all changed files:
+   - **Layer violations:** grep changed backend files for direct database/ORM imports (e.g., `from sqlalchemy`, `import asyncpg`, `Session`) in route handlers or service files. Only repository files may import DB primitives.
+   - **Dead code from recent edits:** check if any functions, components, or handlers in changed files are now unused — look for orphaned imports, duplicated handlers (same logic in two places), and functions no longer called after refactoring.
+   - **Duplicated handlers:** if a changed file adds a function that duplicates logic already in another file, flag it.
+   - These are structural issues that code review and security audit agents often miss because they focus on logic, not architecture.
+
+5. **Auto-fix deterministic issues** — for each finding, determine if it is safe to auto-fix:
+   - **Auto-fix (safe):** missing imports, unused imports, missing `await`, formatting issues, obvious typos in variable names, missing return type annotations, dead code removal
+   - **Flag for review (unsafe):** logic errors, architecture concerns, security issues, data integrity issues, layer violations, anything requiring judgment
    - For each auto-fix: apply the edit, then re-stage the file with `git add <file>`
    - Report what was auto-fixed and what needs manual attention
 
