@@ -216,8 +216,9 @@ The pipeline runs all stages: build check, unit tests, E2E tests, code review, a
 ### Step 7: Commit
 
 Create a well-structured commit:
-1. Create a fix branch: `git checkout -b fix/<issue-name>`
-2. Stage all relevant files (never stage `.env`, credentials, or temp files)
+1. Determine the developer identifier: `DEV=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | cut -c1-15)`
+2. Create a fix branch: `git checkout -b fix/$DEV/<issue-name>`
+3. Stage all relevant files (never stage `.env`, credentials, or temp files)
 3. Write a clear commit message describing:
    - What the bug was (symptom)
    - What caused it (root cause)

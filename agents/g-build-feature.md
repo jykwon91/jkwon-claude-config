@@ -228,10 +228,12 @@ Detect the project's test runners, linters, and build tools from config files (`
 - If `mode: log-only` or no policy exists: skip this stage
 
 **Stage 8 — Log new tech debt:**
+- **Pull latest first** — run `git stash && git pull --rebase && git stash pop` to get the most recent TECH_DEBT.md before writing, reducing merge conflicts with other developers
 - Write all non-blocking issues discovered during THIS run to `TECH_DEBT.md` — mandatory, never skip
 - Log: code review "Note but don't fix" items, unresolved failures that hit the safety valve, pattern issues noticed but out of scope
 - Read `TECH_DEBT.md` first to match the existing format and avoid duplicates
 - Severity: Critical (data loss/security), High (silent failures/wrong data), Medium (dead code/loose typing), Low (style/refactors)
+- **Commit TECH_DEBT.md changes separately** from feature code so merge conflicts are isolated and easy to resolve
 - Format per issue: `### [Category] Short description` with Effort, Location, Problem, Recommendation
 - Update the issue counts in the header line
 - Do NOT log issues that were fixed during the pipeline
@@ -244,10 +246,11 @@ Detect the project's test runners, linters, and build tools from config files (`
 ### Step 6: Commit
 
 Create a well-structured commit:
-1. Create a feature branch: `git checkout -b feature/<feature-name>`
-2. Stage all relevant files (never stage `.env`, credentials, or temp files)
-3. Write a clear commit message describing what was built and why
-4. Commit
+1. Determine the developer identifier: `DEV=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | cut -c1-15)`
+2. Create a feature branch: `git checkout -b feature/$DEV/<feature-name>`
+3. Stage all relevant files (never stage `.env`, credentials, or temp files)
+4. Write a clear commit message describing what was built and why
+5. Commit
 
 Do NOT push or create a PR — leave that to the user or the main conversation.
 
