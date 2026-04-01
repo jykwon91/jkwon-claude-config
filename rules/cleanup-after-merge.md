@@ -35,3 +35,15 @@ git remote prune origin
 **Only delete branches you own.** Check the branch's last commit author against `git config user.name` before deleting. Never delete another developer's branches — even if they're merged. The branch owner is responsible for their own cleanup.
 
 **If a merged branch belongs to another developer**, leave it. They will clean it up in their own session.
+
+4. **Clean up worktrees** associated with the merged branch:
+
+```bash
+REPO_NAME=$(basename "$(git rev-parse --show-toplevel)")
+WORKTREE_BASE="$(dirname "$(git rev-parse --show-toplevel)")/${REPO_NAME}-worktrees"
+# Remove any worktree that was on the merged branch
+git worktree list --porcelain | grep -B2 "branch refs/heads/<branch-name>" | grep "^worktree " | cut -d' ' -f2 | while read wt; do
+  git worktree remove "$wt" 2>/dev/null || git worktree remove --force "$wt" 2>/dev/null
+done
+git worktree prune
+```
