@@ -22,7 +22,7 @@ When a technical user states or corrects a stack-specific best practice during n
 
 ## Scope — what you can and cannot modify
 
-Auto-capture may ONLY modify files under `stacks/*.md`. All other files in the config repo are owned by @jykwon91 and must not be touched:
+Auto-capture may ONLY modify files under `stacks/*.md`. All other files in the config repo are owned by maintainers and must not be touched:
 - `CLAUDE.md` — off limits
 - `global-preferences.md` — off limits
 - `agents/*.md` — off limits
@@ -35,8 +35,17 @@ If a captured practice is universal (not stack-specific), do NOT add it to any f
 ## How to capture
 
 1. **Identify the stack** — which framework/language does this practice apply to? (React, Python, Go, FastAPI, Django, Vue, etc.)
-2. **Update the local stack guide** — read `~/.claude/stacks/<stack>.md`. If it exists, add the practice in the appropriate section. If it doesn't exist, create it with proper structure.
-3. **PR to global config** — clone/pull `~/.claude/.config-repo`, create a branch `stack/<stack>-<short-description>`, update ONLY `stacks/<stack>.md`, push, and create a PR with a clear title and the practice as the body. Always request review from @jykwon91.
+2. **Identify the developer** — get the current developer's identifier for branch naming:
+   ```bash
+   DEV=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | cut -c1-15)
+   ```
+3. **Update the local stack guide** — read `~/.claude/stacks/<stack>.md`. If it exists, add the practice in the appropriate section. If it doesn't exist, create it with proper structure.
+4. **Check for existing PRs** — before creating a new PR, check if the current developer already has an open PR modifying the same stack file:
+   ```bash
+   gh pr list --state open --author @me --json headRefName --jq '.[].headRefName' 2>/dev/null | grep "stack/$DEV-<stack>"
+   ```
+   If a matching PR exists, push to that branch instead of creating a new one.
+5. **PR to global config** — clone/pull `~/.claude/.config-repo`, create a branch `stack/<dev>-<stack>-<short-description>`, update ONLY `stacks/<stack>.md`, push, and create a PR. Request review from a maintainer listed in CODEOWNERS (or @jykwon91 as fallback).
 
 ## PR format
 
@@ -45,8 +54,6 @@ Title: Add <practice summary> to <stack> guide
 Body: Captured from user during <project/context>.
       Practice: <the exact practice>
       Reason: <why, if the user gave one>
-
-Reviewer: @jykwon91
 ```
 
 ## Tone

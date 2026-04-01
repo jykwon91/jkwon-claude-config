@@ -167,15 +167,17 @@ Write all non-blocking issues discovered during THIS run to `TECH_DEBT.md`. This
 - Pattern issues noticed during diagnosis but out of scope
 
 **How to log:**
-1. Read the current `TECH_DEBT.md` to match format and avoid duplicates
-2. **Dedup check:** For each issue you're about to log, check if a matching issue already exists (match on file path + short description). Skip any issue that's already listed. Use `g-tech-debt-scan`'s format as the canonical format.
-3. Determine severity:
+1. **Pull latest first** — run `git stash && git pull --rebase && git stash pop` to get the most recent TECH_DEBT.md before writing, reducing merge conflicts with other developers
+2. Read the current `TECH_DEBT.md` to match format and avoid duplicates
+3. **Dedup check:** For each issue you're about to log, check if a matching issue already exists (match on file path + short description). Skip any issue that's already listed. Use `g-tech-debt-scan`'s format as the canonical format.
+4. Determine severity:
    - **Critical** — data loss, data corruption, security breach, broken user flows
    - **High** — silent failures, wrong data shown to users, missing access control
    - **Medium** — dead code, loose typing, missing validation on non-critical fields
    - **Low** — style issues, minor refactors, test improvements
-3. Append new issues following the existing format
-4. Update the issue counts in the header
+5. Append new issues following the existing format
+6. Update the issue counts in the header
+7. **Commit TECH_DEBT.md changes separately** from feature code — use a dedicated commit (e.g., `chore: log tech debt from pipeline run`) so merge conflicts are isolated and easy to resolve
 
 **Do NOT log:**
 - Issues that were fixed during the pipeline (Stages 1-7)

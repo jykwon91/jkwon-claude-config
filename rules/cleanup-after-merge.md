@@ -18,17 +18,20 @@ git checkout main && git pull && git branch -d <branch-name> && git push origin 
 git remote prune origin
 ```
 
-3. **Check for other merged branches** that should be cleaned up:
+3. **Check for other merged branches that belong to the current developer** that should be cleaned up:
 
 ```bash
-git branch --merged main | grep -v '^\*\|main\|master'
-```
-
-If any exist, delete them all (local and remote):
-
-```bash
-git branch --merged main | grep -v '^\*\|main\|master' | while read b; do git branch -d "$b" && git push origin --delete "$b" 2>/dev/null; done
+ME=$(git config user.name)
+git branch --merged main | grep -v '^\*\|main\|master' | while read b; do
+  # Only delete if the branch's last commit is by the current developer
+  AUTHOR=$(git log -1 --format='%an' "$b" 2>/dev/null)
+  if [ "$AUTHOR" = "$ME" ]; then
+    git branch -d "$b" && git push origin --delete "$b" 2>/dev/null
+  fi
+done
 git remote prune origin
 ```
 
-**Never leave merged branches hanging — locally or on GitHub.** If a branch's PR is merged, both the local and remote branch should be deleted immediately.
+**Only delete branches you own.** Check the branch's last commit author against `git config user.name` before deleting. Never delete another developer's branches — even if they're merged. The branch owner is responsible for their own cleanup.
+
+**If a merged branch belongs to another developer**, leave it. They will clean it up in their own session.

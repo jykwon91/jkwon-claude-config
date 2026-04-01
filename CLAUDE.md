@@ -8,7 +8,9 @@ This repo is the shared Claude Code configuration for all projects. It contains 
 
 ## Ownership
 
-The following files are owned by @jykwon91 and must not be modified by automated processes (auto-capture, agents, scripts) or other contributors without explicit approval:
+**Maintainers:** @jykwon91 (primary), plus anyone listed in the `CODEOWNERS` file if it exists.
+
+The following files are owned by maintainers and must not be modified by automated processes (auto-capture, agents, scripts) or other contributors without explicit approval:
 
 - `CLAUDE.md` — repo rules and structure
 - `global-preferences.md` — universal engineering preferences
@@ -19,13 +21,13 @@ The following files are owned by @jykwon91 and must not be modified by automated
 **Files that CAN be modified via automated PRs** (e.g., auto-capture from technical users):
 - `stacks/*.md` — stack-specific guides (react.md, python.md, etc.)
 
-When creating automated PRs to `stacks/*.md`, always tag @jykwon91 as reviewer.
+When creating automated PRs to `stacks/*.md`, request review from a maintainer. If a `CODEOWNERS` file exists, GitHub will auto-assign the right reviewer.
 
 ## Workflow
 
 - Never push directly to main — always create a feature branch and open a PR, even for single-file changes.
 - Always check if a PR has been merged before pushing additional commits to a branch.
-- Branch naming: `feature/<name>`, `fix/<name>`, `stack/<name>` (for stack guide updates).
+- Branch naming: `feature/<dev>/<name>`, `fix/<dev>/<name>`, `stack/<dev>-<name>` — where `<dev>` is a short developer identifier derived from `git config user.name` (e.g., lowercase, hyphenated, max 15 chars). This prevents branch collisions when multiple developers work on the same project.
 
 ## Structure
 
