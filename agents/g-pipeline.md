@@ -65,9 +65,10 @@ After all individual fixes, re-run full suites to confirm no regressions.
 2. Verify frontend and backend servers are running
 3. If servers are NOT running:
    a. Read CLAUDE.md for the project's dev server start commands
-   b. Start servers in background
-   c. Wait up to 30 seconds for servers to become healthy (poll health endpoints or ports)
-   d. If servers fail to start after 30 seconds, THEN report as blocker and stop
+   b. **Worktree check:** if running in a git worktree (detect via `git rev-parse --git-common-dir` differing from `--git-dir`), use offset ports to avoid collisions with the main repo's servers. Check CLAUDE.md for port override env vars, or use common defaults (e.g., PORT=3001, --port 8001).
+   c. Start servers in background
+   d. Wait up to 30 seconds for servers to become healthy (poll health endpoints or ports)
+   e. If servers fail to start after 30 seconds, THEN report as blocker and stop
 4. Only advance when servers respond to health checks
 
 ---
