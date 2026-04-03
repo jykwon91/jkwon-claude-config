@@ -28,7 +28,9 @@ For each function/component, write:
 4. Write tests that would have caught any obvious bugs you noticed
 5. Run existing tests first to confirm they pass before adding new ones
 
-Prefer well-supported testing utilities and libraries over custom test infrastructure.
+## Prefer existing tools over custom solutions
+
+When writing tests, prefer well-supported testing utilities and libraries (fixtures, factories, assertion helpers) over custom test infrastructure. Research whether an existing library solves the testing need before writing custom helpers. Only build custom when no existing solution fits the exact requirement.
 
 ## Rules
 

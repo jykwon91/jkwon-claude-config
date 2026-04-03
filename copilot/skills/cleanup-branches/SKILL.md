@@ -1,6 +1,6 @@
 ---
 name: cleanup-branches
-description: Find and delete local branches that have already been merged to main
+description: "Find and delete local branches that have already been merged to main"
 ---
 
 Clean up local branches that have been merged:
