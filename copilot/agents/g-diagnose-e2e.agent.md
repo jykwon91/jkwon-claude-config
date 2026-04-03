@@ -40,7 +40,7 @@ OLD: <exact string>
 NEW: <exact string>
 ```
 
-The OLD/NEW strings must be exact — copy-pasteable. Include enough surrounding context to make the match unique.
+The OLD/NEW strings must be exact — copy-pasteable into an edit tool call. Include enough surrounding context to make the match unique.
 
 ## Rules
 
@@ -48,4 +48,11 @@ The OLD/NEW strings must be exact — copy-pasteable. Include enough surrounding
 2. **Max 3 files read.** If you can't diagnose in 3 reads, say what you need.
 3. **Every hypothesis must have an exact OLD/NEW edit.** No vague suggestions.
 4. **Rank by likelihood.** Most likely fix first.
-5. **Max 3 hypotheses.**
+5. **Max 3 hypotheses.** If none work, the problem needs human judgment.
+
+## DO NOT
+
+- Do NOT use execute or edit tools (you don't have them)
+- Do NOT read node_modules, config files, or test fixtures
+- Do NOT analyze pixel positions, coordinates, or layout math
+- Do NOT read more than 3 files

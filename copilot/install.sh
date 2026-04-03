@@ -17,7 +17,7 @@ echo ""
 # --- Global instructions ---
 mkdir -p "$GITHUB_HOME"
 cp "$SCRIPT_DIR/copilot-instructions.md" "$GITHUB_HOME/copilot-instructions.md"
-echo "[OK] Global instructions → $GITHUB_HOME/copilot-instructions.md"
+echo "[OK] Global instructions -> $GITHUB_HOME/copilot-instructions.md"
 
 # --- Agents ---
 mkdir -p "$COPILOT_HOME/agents"
@@ -40,7 +40,7 @@ for agent in "$SCRIPT_DIR"/agents/*.agent.md; do
   cp "$agent" "$COPILOT_HOME/agents/$(basename "$agent")"
   agent_count=$((agent_count + 1))
 done
-echo "[OK] $agent_count agents → $COPILOT_HOME/agents/"
+echo "[OK] $agent_count agents -> $COPILOT_HOME/agents/"
 
 # --- Skills ---
 mkdir -p "$COPILOT_HOME/skills"
@@ -65,7 +65,7 @@ for skill_dir in "$SCRIPT_DIR"/skills/*/; do
   cp "$skill_dir"SKILL.md "$COPILOT_HOME/skills/$skill_name/SKILL.md"
   skill_count=$((skill_count + 1))
 done
-echo "[OK] $skill_count skills → $COPILOT_HOME/skills/"
+echo "[OK] $skill_count skills -> $COPILOT_HOME/skills/"
 
 echo ""
 echo "Done! Installed:"
