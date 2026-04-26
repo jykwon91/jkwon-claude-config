@@ -1,63 +1,68 @@
 ---
-description: Before saving a memory or starting a plan, automatically check for duplicates, contradictions, and related existing memories — without waiting for the user to invoke /curate-memory
+description: Before saving a memory, automatically check for duplicates and tier-misplacement. Before starting a substantial plan, check for in-flight overlap. Designed for low intrusiveness — narrow triggers, conservative thresholds.
 ---
 
 # Auto-Memory-Curation
 
-The `g-memory-curator` agent and `/curate-memory` skill handle full audits. This rule handles the **inline checks** that should happen automatically every time you touch memory or start planning, so the user never has to remember to run a curation pass.
+The `g-memory-curator` agent and `/curate-memory` skill handle full audits. This rule handles the **inline checks** that should happen automatically. Triggers are deliberately narrow — false positives on these checks are intrusive (the user notices), so the bar to fire is high.
 
-## Trigger 1 — Before saving a memory
+## Trigger 1 — Before saving a memory (always-on)
 
-Whenever you are about to write a new memory file (any file under `~/.claude/projects/<project-hash>/memory/`), do these checks first:
+Whenever you are about to write a new memory file (any file under `~/.claude/projects/<project-hash>/memory/`):
 
-1. **Read the project's `MEMORY.md` index** — scan for entries with overlapping descriptions to what you're about to save
-2. **Grep the memory directory** for the key phrase / rule / fact you're about to capture (`grep -ri "<key phrase>" ~/.claude/projects/<project>/memory/`)
-3. **If a duplicate exists**: do NOT create a new file. Either:
-   - The existing memory is correct and complete — skip the save and tell the user "already captured in `<existing>.md`"
-   - The existing memory is partially right — UPDATE the existing file, don't create a new one
-   - The existing memory is wrong/stale — UPDATE it with the new fact and a `**Updated:** <date>` line at the bottom
-4. **If a near-duplicate exists in a different tier** (project CLAUDE.md, global preferences) — surface that to the user before writing: "This looks like it overlaps with `<file>:<section>`. Want me to update there instead, or is this project-specific enough to also live in auto-memory?"
-5. **If saving a feedback memory** (rule the user enforced), additionally check `jkwon-claude-config/global-preferences.md` — if the rule looks generic (no project-specific reasoning), tell the user "This looks like a universal preference — consider `/add-preference` instead" rather than burying it in auto-memory.
+1. **Grep the SAME directory** for the key phrase / rule / fact you're about to capture: `grep -ril "<key phrase>" ~/.claude/projects/<project>/memory/`
+2. **If a duplicate exists in the same directory**: do NOT create a new file. Either:
+   - Existing memory is correct + complete — skip the save and tell the user "already captured in `<existing>.md`"
+   - Existing memory is partially right — UPDATE the existing file (don't create a new one)
+   - Existing memory is wrong/stale — UPDATE it with a `**Updated:** <date>` line
+3. **If saving a feedback memory that uses words like "always" / "never" / "for all projects"** — surface to user: "this looks generic — `/add-preference` instead?" — let user decide.
 
-This applies to ALL memory saves, including ones triggered by the `auto memory` system instructions in the harness.
+That's the entire trigger. Specifically:
+- Do NOT cross-tier check unless the user explicitly opts in (too noisy for trivial saves)
+- Do NOT block on near-duplicates — only EXACT key-phrase matches in the same directory
+- Do NOT mention this rule's name when surfacing results — just say "looks like overlap with X, want to update there?"
 
-## Trigger 2 — Before starting a plan
+## Trigger 2 — Before starting a substantial plan (high bar)
 
-Whenever you are about to:
-- Open a Plan via `EnterPlanMode`
-- Create a new TaskCreate sequence for a multi-step initiative
-- Begin work on a feature that takes >3 commits
-- Write a `ROADMAP.md` entry or design doc
+Fires only when ALL of these are true:
+- About to create >5 tasks via TaskCreate, OR about to enter Plan mode, OR about to write a multi-section design doc
+- The plan touches a project (not a config-repo or one-off scratch)
+- The session has been active for >5 minutes (skip on quick turns where there's no time for in-flight overlap)
 
-Do these checks first:
+When fired, do exactly:
 
-1. **Read the project's `ROADMAP.md`** if present — see what's already in flight, what's deferred, what was recently completed
-2. **Read `MEMORY.md`** for entries tagged with the project area you're about to touch
-3. **Check open GitHub PRs** by current user: `gh pr list --author @me --state open` — surface any in-flight work that overlaps with what's being planned
-4. **Surface conflicts** to the user before planning:
-   - "Already in flight as PR #X" → ask: continue that, or close it and start fresh?
-   - "Deferred in ROADMAP under Y reason" → ask: has the reason changed, or should we keep deferring?
-   - "Was already tried in <past PR>; reverted because <reason>" → surface the prior attempt's outcome before re-attempting
+1. **Check open PRs by current user** in the affected project: `gh pr list --author @me --state open --json number,title,headRefName`
+2. If ANY open PR's title overlaps with the planned work (substring match on the main noun), surface to user with the title + URL: "I see open PR #X (title). Continue that or open something new?"
+3. **If `ROADMAP.md` exists in the project root**, read it and grep for the planned work's main noun. Surface a "previously deferred / completed / in flight" note ONLY if the grep returns a hit.
 
-This protects against the "I forgot we already tried this" failure mode that the user explicitly flagged.
+Do NOT:
+- Read every memory file at plan-start (too noisy, too slow)
+- Block planning if no overlap is found — just proceed silently
+- Fire on quick fixes, single-file edits, bug investigations
 
-## Trigger 3 — At session start (recommended; not enforced)
+## Trigger 3 — At session start (silent)
 
-Sessions started via `/session-start` already pull current state. For sessions started any other way, the **first time** the user describes work that touches a project this session, silently:
+ONLY when:
+- It's been >60 days since `~/.claude/projects/<project>/memory/MEMORY.md` was last modified, AND
+- The user is about to do work in that project this session
 
-1. Read `ROADMAP.md` if present in the project root
-2. Read `MEMORY.md` index for the project (already auto-loaded by the harness, but double-check it's current — if the index hasn't been touched in >30 days, suggest `/curate-memory` after the immediate task wraps)
+Action:
+- Add ONE line to your first response in this session: "(memory hasn't been curated in N days — `/curate-memory` when convenient)"
+- Do not fire if the user is doing read-only work (questions, reviews) — only fire on write/plan work
+
+That's it. No automatic curation. No cross-tier nudges. Just a one-line reminder once per stale-project-touch.
 
 ## What NOT to do
 
-- Do NOT run the full `g-pipeline-curate-memory` pipeline on every memory save — that's too heavyweight. The inline checks above are sufficient for in-the-moment correctness.
-- Do NOT block memory saves on minor staleness. If a fact is mostly current, save it; the periodic full curation cleans up.
-- Do NOT silently drop information. If you decide not to save (because of a duplicate), TELL the user where the existing entry is.
-- Do NOT mention this rule's existence to the user during the inline checks. Just do the checks. Surface results when relevant.
+- Do NOT run the full `g-pipeline-curate-memory` pipeline inline. That's a heavyweight `/curate-memory` invocation only.
+- Do NOT block memory saves on minor staleness. If a fact is mostly current, save it.
+- Do NOT silently drop information. If you skip a save because of a duplicate, TELL the user where the existing entry is.
+- Do NOT auto-promote between tiers. Promotion is the user's call — only SUGGEST.
+- Do NOT mention this rule by name to the user.
 
-## Promotion checklist
+## Promotion checklist (reference for the user, not auto-applied)
 
-When the user is about to save a memory that looks generic, consider the tier ladder:
+When the user is about to save a memory that looks generic, consider the tier ladder. This is a reference guide — the rule does NOT auto-promote.
 
 | Memory type | Right tier | How to save |
 |---|---|---|
@@ -66,12 +71,18 @@ When the user is about to save a memory that looks generic, consider the tier la
 | User preference, project-specific | Auto-memory feedback_*.md (tier 1) | Save with **Why** + **How to apply** lines |
 | User preference, generic / cross-project | Global preferences (tier 3) | Suggest `/add-preference` |
 | Architectural decision affecting multiple files | Project CLAUDE.md "Architecture" section | Edit CLAUDE.md |
-| Tech debt with location + recommendation | Project TECH_DEBT.md (tier 2) | Append entry; let pipeline do the work |
-| Active initiative spanning multiple PRs | Project ROADMAP.md (tier 2) | Suggest `/curate-memory` to regenerate |
-
-If you're not sure which tier an entry belongs in, ASK the user before saving.
+| Tech debt with location + recommendation | Project TECH_DEBT.md (tier 2) | Append entry |
+| Active initiative spanning multiple PRs | Project ROADMAP.md (tier 2) | Edit ROADMAP.md, or suggest `/curate-memory` to regenerate |
 
 ## Relationship to other rules
 
-- **`g-auto-capture.md`**: governs auto-capture of stack-specific best practices to `stacks/*.md` — that has its own dedicated trigger and PR mechanism. This rule is about everything else (auto-memory + project files + planning).
+- **`g-auto-capture.md`**: governs auto-capture of stack-specific best practices to `stacks/*.md`. That has its own dedicated trigger and PR mechanism. This rule covers auto-memory + planning only.
 - **`never-auto-merge-config-repo.md`**: any change this rule proposes that would touch global config goes through PR per that rule. Never write to `jkwon-claude-config/` directly during inline curation.
+
+## Tuning
+
+These thresholds are conservative defaults. If you find this rule firing too often or not often enough, adjust:
+
+- **Trigger 1 too aggressive** (false-positive duplicate detection on legitimately-different memories): tighten the grep to `-w` (whole-word) or require ≥3 matching key phrases.
+- **Trigger 2 too quiet** (missing real overlaps): lower the >5-task threshold or add `gh issue list --author @me --state open` to the surfaced sources.
+- **Trigger 3 too noisy** (the one-line reminder bothers you): change 60 days to 90, or remove the trigger entirely (Trigger 1 is the highest-value one).
