@@ -1,5 +1,7 @@
 # Change Types: Objective, Subjective, Personal
 
+> **The framework itself is open to better proposals.** This document codifies one current cut of how to classify changes. If you encounter a different framework that fits the actual decision-making better — fewer tiers, more tiers, different boundaries, different review bars — open a PR replacing this doc. The framework is not load-bearing; the underlying need to distinguish "fast-merge fact" from "needs-debate opinion" from "don't-share-at-all" is what matters. See [Proposing a different framework](#proposing-a-different-framework) at the bottom.
+
 Every change you consider making to your Claude Code setup falls into one of three categories. The category decides **whether the change belongs in this shared repo at all**, and if so, **how much review it deserves**.
 
 | Type | Belongs in shared `jkwon-claude-config` repo? | Review bar | PR title prefix |
@@ -134,3 +136,36 @@ Is the change provably the only-reasonable-choice?
 
 - `rules/never-auto-merge-config-repo.md` — even objective changes wait for human merge in this repo
 - `rules/g-auto-capture.md` — automated stack-guide additions to `stacks/*.md` (still go through PR)
+
+---
+
+## Proposing a different framework
+
+The 3-tier objective/subjective/personal split is one valid way to classify changes. There are others. If you (or anyone using this config repo) thinks a different framework would work better, propose it.
+
+### Examples of frameworks that might be better
+
+- **2 tiers** — drop the personal tier; assume everyone knows personal config doesn't belong here. (Pro: simpler. Con: drops the explicit boundary that protects the shared repo from one-person noise.)
+- **4+ tiers** — split objective into "trivial" (typos) vs "verified objective" (CVE patches with cited evidence). Or split subjective into "low-stakes opinion" vs "load-bearing opinion." (Pro: finer review-bar calibration. Con: more decisions per PR.)
+- **Severity-based** — tag by potential blast radius (low / medium / high) rather than by epistemic certainty. (Pro: focuses review attention on what could go wrong, not on whether the change is "correct." Con: most config-repo changes have low blast radius, so most PRs end up tagged the same way.)
+- **Audience-based** — tag by who needs to read the change (everyone / agent-authors / no-one). (Pro: routes review to relevant people. Con: this repo has one maintainer right now.)
+- **Skip tagging entirely** — trust commit messages + PR descriptions; let the maintainer decide review depth on the fly. (Pro: zero overhead. Con: returns to the failure mode that prompted tagging in the first place — every PR feels equally important.)
+
+### How to propose one
+
+1. Open a PR that REPLACES this doc with the alternative framework
+2. In the PR body, explain:
+   - What the new tiers / categories are
+   - What problem the existing 3-tier framework fails to solve
+   - How existing PRs would be re-classified under the new framework (sanity check that it covers the same ground)
+3. If accepted, the new framework supersedes this one — update `feedback_pr_tags_config_repo` memory (or wherever the title-prefix process is canonically defined) to match.
+
+### When NOT to propose a replacement
+
+- The existing tiers cover the case but the EXAMPLES are wrong → don't replace the framework, just edit the examples (still PR'd, but tagged objective since the framework is unchanged)
+- A specific PR doesn't fit cleanly into a tier → that's a tagging judgment call, not a framework problem; tag the higher bar and move on
+- You disagree with where the boundary is between two tiers → adjust the boundary text in the existing definitions; don't replace the whole framework
+
+### Bias check
+
+If you're tempted to defend the current framework because it's already in place, that's status-quo bias. The 3-tier split exists because it was the first cut that worked, not because it's optimal. Treat alternatives on their merits.
