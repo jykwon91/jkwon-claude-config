@@ -24,9 +24,9 @@ GitHub state is a 5th surface: open issues, open PRs, recent merged PRs (last 30
 
 For each project the user works on (read `~/.claude/.config-repo/projects.txt` if present, else discover from `~/Documents/Git/`):
 
-1. List every memory file under the project's auto-memory directory and all sibling directories (worktree copies share the same project root but get their own hash; e.g., `C--Users-jason-Documents-Git-MyBookkeeper/memory/` AND `C--Users-jason-Documents-Git-MyBookkeeper--claude-worktrees-*/memory/`)
+1. List every memory file under the project's auto-memory directory at `~/.claude/projects/<project-hash>/memory/`. Worktree-named directories like `C--Users-jason-Documents-Git-<project>--claude-worktrees-*` contain only session jsonls (per-session UUIDs and `.jsonl` files), NOT a `memory/` subdir — do not look there for memory files.
 2. Read the project's `CLAUDE.md`, `TECH_DEBT.md`, `ROADMAP.md`, `PRIVACY.md`, `DEPLOY_NOTES.md` if present
-3. Cross-reference with GitHub state via `gh pr list --state all --limit 50` and `gh issue list --state all --limit 50`
+3. Cross-reference with GitHub state via `gh pr list --state all --limit 100 --search "merged:>$(date -d '60 days ago' +%Y-%m-%d)"` (active repos can have 80+ merges in 30 days; default `--limit 30` misses recent context) and `gh issue list --state all --limit 100`
 
 For global tier:
 1. Read `jkwon-claude-config/global-preferences.md` and `jkwon-claude-config/PREFERENCES.md`
@@ -44,16 +44,27 @@ For every memory file (especially in tier 1 — auto-memory) and every CLAUDE.md
 - **DEMOTE** — too project-specific to live in global; should move down a tier
 - **SPLIT** — single file conflates multiple distinct concerns; should become 2+ entries
 - **ORPHAN** — memory references files/PRs/branches that no longer exist; specify whether to delete or update
+- **REVIEW** — partial truth; the user should decide if it stays as-is or gets updated. Use when pure UPDATE would lose useful reference info but pure KEEP misleads. Surface to user with no auto-action.
 
 ## Detection rules (concrete signals)
 
 ### Stale signals
-- Memory mentions PR # that is MERGED → DELETE memory unless the PR's content is itself the lesson worth keeping
+
+Tier the staleness threshold by file type (active projects have shorter half-lives than the 60-day default):
+
+| File prefix | Threshold | Reasoning |
+|---|---|---|
+| `project_*.md` | 30 days | Project state changes fast — PRs merge in hours, plans implement in days |
+| `feedback_*.md` | 90 days | Preferences are mostly timeless; only revisit when explicitly contradicted |
+| `reference_*.md` | no auto-stale | Pointers to external systems rarely go stale on a clock |
+
+Specific signals:
+- Memory mentions PR # that is MERGED → DELETE memory unless the PR's content is itself the lesson worth keeping. Threshold for the rule firing is intentionally low — most memory files won't reference PR numbers, but when they do (e.g., `project_creds_in_history.md` mentions PR #229), the rule should fire even if it's the only hit.
 - Memory mentions PR # that is CLOSED-without-merge → DELETE
-- Memory mentions a date ("as of 2026-03-15...") older than 60 days AND describes ongoing state → likely stale, flag for UPDATE or DELETE
+- Memory mentions a date ("as of 2026-03-15...") older than the file's tier threshold AND describes ongoing state → flag for UPDATE or DELETE
 - Memory mentions a branch that no longer exists on origin → ORPHAN
 - Memory mentions a file path that no longer exists → ORPHAN
-- "Pending" / "in progress" / "current TODO" memories that are >30 days old → likely abandoned, flag for review
+- "Pending" / "in progress" / "current TODO" memories older than 30 days → likely abandoned, flag for REVIEW
 - Multiple memories with conflicting dates on the same fact → keep the most recent, DELETE the older
 
 ### Duplication signals
@@ -66,8 +77,17 @@ For every memory file (especially in tier 1 — auto-memory) and every CLAUDE.md
 - Global preference that names a specific file path or app component → DEMOTE to project CLAUDE.md
 - TECH_DEBT.md entry that's actually a feature request, not debt → PROMOTE to ROADMAP.md or open as GitHub issue
 
-### Worktree-fanout signals (specific to this user's setup)
-- Same memory directory pattern repeated under multiple `<project>--claude-worktrees-*` paths → all duplicates of the parent project's memory; pick the parent and DELETE the worktree copies (or symlink — the pipeline can decide)
+### Worktree-session-jsonl signals (specific to this user's setup)
+
+Worktree directories at `~/.claude/projects/<project>--claude-worktrees-*/` do NOT contain `memory/` subdirs — they hold only per-session jsonl files. The original "fanout duplicates" signal does not match reality. Repurpose this category to detect old session jsonls instead:
+- Session jsonl files older than 30 days under any `--claude-worktrees-*` path → safe to delete (these are conversation logs from completed worktree sessions; no memory content lives there)
+
+### Other signals
+- Empty `MEMORY.md` section header (a `## ...` line followed by no bullets) → flag for either deletion of the header or population from disk
+- Pointer-to-pointer: file A says "see B" and file B is itself a pointer with no content → likely both DELETE or one MERGE
+- Date-anchored filename for live content: `project_todo_2026_03_28.md` is the live TODO but is named with a fixed date → propose RENAME to drop the date (or migrate content to a dated archive when superseded)
+- CLAUDE.md duplication: paragraph in `feedback_*.md` matches paragraph in `<project>/CLAUDE.md` verbatim → DELETE the auto-memory copy (CLAUDE.md is canonical)
+- Untracked-orphan in repo root: file in working directory with a path-encoded filename like `UsersjasonDocumentsGitMyBookkeeperTECH_DEBT.md` → tool path-encoding bug, surface for cleanup
 
 ## Output format
 

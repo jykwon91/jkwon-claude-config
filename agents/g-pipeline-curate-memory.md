@@ -15,9 +15,21 @@ If `scope=all`, you operate across every project listed in `~/.claude/.config-re
 
 ## Stage 1 — Audit
 
-Invoke `g-memory-curator` with the same scope. Get back the audit report. Save it to `~/MEMORY_AUDIT_<YYYY-MM-DD>.md` so the user has an artifact even if the pipeline is interrupted.
+Invoke `g-memory-curator` with the same scope. Get back the audit report. Save it to `~/.claude/projects/<project-hash>/MEMORY_AUDIT_<YYYY-MM-DD>.md` (NOT to the project working directory — see `rules/non-code-public-repo-guardrails.md`; audit reports may contain VPS paths, internal context, and recently-completed PR lists that don't belong in a public repo).
 
 If the report says zero issues, STOP — print "Memory is current. Nothing to do." and exit.
+
+### Stage 1b — Tier-0 (task-list) curation
+
+Auto-memory and CLAUDE.md/TECH_DEBT.md are not the only places stale memory accumulates. The TaskList tool stores tier-0 ephemeral task entries within the conversation. Across long sessions, tasks naming merged PRs / completed features / shipped milestones pile up.
+
+For the current session's TaskList:
+1. Read every task with `TaskList` (or equivalent for the running harness)
+2. For tasks naming a PR number, check `gh pr view <num> --json state` — if MERGED or CLOSED, propose `status: completed` (or `status: deleted` for closed-without-merge)
+3. For tasks naming a feature/milestone, cross-reference with the audit's "recently completed" list — propose `status: completed`
+4. Surface the proposed task-list updates as part of the Bucket B output (user owns the call — task entries can be load-bearing context the curator doesn't see)
+
+This stage is best-effort: if `TaskList` is unavailable in the current harness, skip and note in the report.
 
 ## Stage 2 — Triage
 
@@ -50,11 +62,14 @@ For each Bucket A action, perform the change with safety nets:
 
 ### Backup
 
-Before any modification, create a single backup tarball of the entire memory tree:
+Before any modification, create a backup tarball containing ONLY the memory directories (not session jsonls, which are most of the bytes and which the pipeline never modifies):
 ```bash
 BACKUP_DIR="$HOME/.claude/memory-backups"
 mkdir -p "$BACKUP_DIR"
-tar -czf "$BACKUP_DIR/memory-$(date +%Y%m%d-%H%M%S).tar.gz" -C "$HOME/.claude/projects" .
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+# Find every memory/ subdir and tar them — fast, small, restoreable.
+find "$HOME/.claude/projects" -maxdepth 2 -type d -name memory -print0 \
+  | tar -czf "$BACKUP_DIR/memory-$TIMESTAMP.tar.gz" --null -T -
 ```
 Keep last 14 backups; prune older.
 
@@ -62,7 +77,7 @@ Keep last 14 backups; prune older.
 
 - DELETE: `rm` the file. Then update the parent `MEMORY.md` index (remove the bullet pointing at it).
 - MERGE: read both files, write the consolidated text to the canonical filename, `rm` the merged-from file, update `MEMORY.md`.
-- Worktree-fanout: keep the parent project's directory; `rm -rf` the worktree-hashed mirrors (after confirming via `diff` that they really are identical or strictly subsets).
+- Worktree session-jsonl cleanup: under any `~/.claude/projects/<project>--claude-worktrees-*/` path, delete `.jsonl` and per-session UUID dirs older than 30 days. Do NOT touch any `memory/` subdir — those don't exist at this location, but defensive: only delete files matching the session-jsonl pattern.
 
 ### Regenerate MEMORY.md
 
@@ -80,7 +95,7 @@ After all changes, regenerate the `MEMORY.md` index for each touched project fro
 ## (other groupings — read existing index for groupings to preserve)
 ```
 
-Cap at 150 entries. If pruning to 150 means dropping entries, surface those to the user as additional Bucket B candidates rather than silently dropping.
+Cap at 100 entries (down from prior 150 — the auto-loaded `MEMORY.md` truncates at line 200, so a tighter visible cap leaves headroom for natural growth between curation runs). If pruning to 100 means dropping entries, surface those to the user as additional Bucket B candidates rather than silently dropping. When the index approaches the cap (>=90 entries), include "approaching index cap, consider consolidation" in the final summary.
 
 ## Stage 4 — Surface Bucket B
 
@@ -117,9 +132,13 @@ Per project (and globally), emit a single `ROADMAP.md` at the project root that 
 - [from CONTRADICTIONS bucket the user deferred]
 ```
 
-If the project repo already has a ROADMAP.md, OPEN A PR with the regenerated content rather than overwriting directly. If not, write it directly to the working directory and tell the user to commit if they want it tracked.
+**Where to write ROADMAP.md** depends on whether the repo is public or private (per `rules/non-code-public-repo-guardrails.md`):
 
-The point of ROADMAP.md is **visibility**: anything the assistant should "know about" when starting the next session lives here, with cross-links to memories, issues, and PRs.
+- **Public repos** (e.g., MyFreeApps): write to `~/.claude/projects/<project-hash>/ROADMAP.md` instead of the working tree. Roadmaps contain VPS paths, deferred decisions, and cross-references to private memory files — none of which belong in a public repo, even gitignored. Tell the user where it landed.
+- **Private repos** (e.g., MyBookkeeper while still private): write to the project working directory and add to `.gitignore` if not already excluded. Tell the user it's local-only.
+- **Existing ROADMAP.md in the working tree of a public repo**: surface as a warning and propose moving it to `~/.claude/projects/<project-hash>/ROADMAP.md` — do not overwrite or PR.
+
+The point of ROADMAP.md is **visibility**: anything the assistant should "know about" when starting the next session lives here, with cross-links to memories, issues, and PRs. The visibility is for the operator, not for collaborators.
 
 ## Stage 6 — Report
 
@@ -154,9 +173,17 @@ Recommended next-run cadence: weekly (the staleness signals re-accumulate fastes
 
 ## Multi-session safety
 
-Memory files are read by every session. If another session is currently active in any of the projects being curated, hold off on changes there — write the proposed actions to `~/MEMORY_AUDIT_<date>.md` and recommend the user re-run when other sessions are idle.
+Memory files are read by every session. If another session is currently active in any of the projects being curated, hold off on memory-file changes there — write the proposed actions to the per-project audit report and recommend the user re-run when other sessions are idle.
 
-Detect active sessions via `git status` in each project directory (uncommitted changes + non-main branch suggests active work).
+The naive rule "uncommitted changes = active session" produces false positives (the curator session itself counts; unrelated leftover work from prior sessions counts). Use this composite signal instead:
+
+1. `git status --porcelain` non-empty AND
+2. Either: `git branch --show-current` is not main/master, OR `git stash list` has entries newer than 24h, OR
+3. There's a `.jsonl` file under `~/.claude/projects/<project-hash>/` with mtime in the last 60 minutes (a session is actively writing)
+
+Only condition (3) on its own is enough to defer changes in that project — recent jsonl mtime is the strongest signal of active work. Conditions (1)+(2) without (3) means stale local state, not an active session — proceed but warn.
+
+Even when an active session is detected, regenerating MEMORY.md (metadata-only — no content changes) is safe to do.
 
 ## Scheduling
 
