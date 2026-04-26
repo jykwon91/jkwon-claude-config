@@ -34,6 +34,7 @@ A "secure enough" baseline for a public app handling PII without enterprise budg
 - Weak or hardcoded credentials, secrets in code or logs (`.env` committed with real values)
 - Insecure session management, missing token expiry
 - **Account lockout missing** — without it, attackers can brute-force passwords forever. Require: 5 consecutive failures → exponential backoff (1m → 5m → 15m → 1h → 24h), counter auto-reset after 24h. Two enforcement layers (route-level dependency + auth-manager increment) so the lock is impossible to bypass via API surface gaps.
+- **Per-IP rate limit on login endpoints missing** — account lockout protects ONE account; per-IP rate limit protects against credential stuffing (an attacker hitting many different valid accounts from one IP, one attempt each, triggers zero account lockouts). Require BOTH layers — they defend different attacks. Suggest 30 req/min/IP via `slowapi` (in-process, no Redis) on `POST /auth/login` AND `POST /auth/totp/login`. The 429 response body MUST be byte-identical to the account-lockout 429 response so callers can't distinguish which gate fired. Do NOT include a `Retry-After` header (helps attackers calibrate).
 - **Compromised-password check missing** — passwords in known breach corpora (HaveIBeenPwned k-anonymity API) must be rejected at registration AND password reset. The k-anonymity protocol means plaintext never leaves your server (only first 5 hex chars of SHA1 prefix sent). Fail-open on HIBP outage with WARNING log.
 - **Password length policy** — minimum 12 chars (NIST/OWASP 2026 guidance), no max length, no forced complexity rules (length + breach check are stronger than complexity).
 - **Email verification missing** — new accounts must verify email before login. Login endpoint returns a distinct `LOGIN_USER_NOT_VERIFIED` detail; frontend surfaces a "resend verification" button. Existing accounts grandfathered to verified via one-time data migration.
@@ -152,7 +153,8 @@ Vetted free/open-source picks for the patterns above:
 | CAPTCHA | Cloudflare Turnstile | Free tier generous; no Google fingerprinting. |
 | Compromised passwords | HIBP k-anonymity range API | Free, plaintext never leaves server. |
 | TLS / reverse proxy | Caddy | Auto-HTTPS via Let's Encrypt; declarative config. |
-| Rate limiting | `slowapi` (FastAPI) or app-level counter in DB | Per-user-per-day quotas without Redis. |
+| Rate limiting (per-user-per-day quotas) | `slowapi` (FastAPI) or app-level counter in DB | E.g., 50 AI-extractions/day. No Redis needed. |
+| Per-IP rate limit (login, sensitive endpoints) | `slowapi` keyed on `get_remote_address` | Required separately from per-account lockout — they defend different attacks. |
 | Static analysis | GitHub CodeQL default-setup | Free for public repos. |
 | Dep CVE scanning | `actions/dependency-review-action` + Dependabot | Free; configurable severity floor. |
 | Secret scanning | `gitleaks-action` | Free; scans every PR. |
