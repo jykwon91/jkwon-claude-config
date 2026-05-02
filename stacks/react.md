@@ -42,6 +42,29 @@ Apply these patterns when the project uses React. Detect React from `package.jso
 - Defer non-critical libraries (analytics, logging) until after initial render.
 - Preload based on user intent (hover/focus) before the actual interaction.
 
+## CRITICAL — Vite + Monorepo Workspaces
+
+- When multiple `package.json` in the workspace declare React (as dep, devDep, or peerDep with hoisted local install), ALWAYS set `resolve.dedupe: ["react", "react-dom"]` in `vite.config.ts`. Without this, Vite resolves React from each package's local `node_modules` separately, producing two physically-distinct React copies in the bundle. Runtime crash: `Invalid hook call / Objects are not valid as a React child / Cannot access property 'useMemo', resolveDispatcher() is null`. The error points at component code; the actual cause is the bundler. Fix takes 30s; without it, hours of wrong-tree debugging.
+- Avoid pinning a hard React version (`"react": "^19.2.5"`) in `devDependencies` of shared component packages. Use `peerDependencies` only — the consumer's React version wins. devDep React in a shared package gets installed into that package's local `node_modules` and conflicts with consumers running a different React major.
+
+## CRITICAL — SPA Cache Headers
+
+- Vite content-hashes asset filenames (e.g. `index-AbCd1234.js`, `assets/index-CfJ7F7lO.js`). Hashed assets are immutable by construction — cache aggressively: `Cache-Control: public, max-age=31536000, immutable`.
+- Entry points (`index.html`, `sw.js`, `manifest.webmanifest`, `registerSW.js`) reference the latest hashed assets and MUST never be cached. Always set `Cache-Control: no-cache, no-store, must-revalidate` on them. Without this, browsers serve stale HTML pointing at deleted bundle hashes for hours/days after a deploy.
+- Configure these at the reverse-proxy / CDN layer (Caddy, nginx, Cloudflare). Set them BEFORE the SPA goes live, not after the first staleness incident — the install-base of stuck browser caches can be very long-lived.
+
+## HIGH — PWA / Service Workers
+
+- Do NOT add `vite-plugin-pwa` (or any service-worker registration) to apps that aren't legitimately offline-first. Service workers precache the bundle and continue serving the precached version even after a deploy, producing "users stuck on stale code for weeks" outages with no visible fix path short of manual cache clear. The deployment-confidence cost (every deploy is suspect, debugging takes hours, users need explicit cleanup) far exceeds the rare offline / Add-to-Home-Screen benefit for online-first SaaS.
+- If a SW is genuinely needed: enable `skipWaiting: true` + `clientsClaim: true` + `cleanupOutdatedCaches: true` in workbox config so new SWs activate immediately and don't accumulate dead precaches. Exclude HTML and the SW itself from precache (NetworkFirst for navigation, never precache `index.html`); cache only content-hashed assets.
+- When removing a previously-shipped PWA, ship a "kill-switch" `public/sw.js` that calls `self.unregister()`, deletes all caches, and reloads any open clients. Browsers re-fetch `sw.js` on page load — they pick up the kill-switch automatically and self-clean. Without it, every existing user has to manually clear site data.
+
+## HIGH — Deploy-pipeline Confidence
+
+- After a UI fix that doesn't reach the user, suspect the deploy pipeline before suspecting the code. Verify in this order: (1) live HTTP response headers + content match expectations (curl from outside the VPS), (2) container filesystem matches the source tree (`docker compose exec ... cat /path/to/asset`), (3) only then re-read your code. Today's classes of staleness: docker named volumes that don't repopulate from new images, image-build cache that doesn't pick up new source, host-Caddy `file_server` pointing at a directory the build pipeline never updates, browser SW caching the old bundle.
+- Add a post-deploy smoke check that fetches the live `index.html`, extracts the asset hash via `grep -oE 'src="/[^"]*index-[A-Za-z0-9_-]+\.js"'`, and asserts that exact file is reachable from the serving layer. If the live HTML and the build-output hash diverge, fail the deploy loudly instead of silently shipping a stale bundle.
+- Don't ship a follow-up "fix" until you've verified the previous fix actually reached production. Cascading wrong fixes (each shipped after the previous one didn't work) is exactly how you accumulate three architecturally-broken layers in one outage.
+
 ## HIGH — Next.js Specific (skip if the project uses Vite/CRA/other SPA bundler)
 
 - Authenticate Server Actions the same as API routes — verify auth inside each action, never rely on middleware alone.
