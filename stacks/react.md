@@ -4,13 +4,41 @@ Apply these patterns when the project uses React. Detect React from `package.jso
 
 ## CRITICAL — Component Architecture
 
-- One component per file — never define multiple components in the same file.
+- One component per file — never define multiple components in the same file. This includes presentational helpers ("just two lines, only used once below") — split them. The cost of an extra file is ~zero; the cost of grep-hunting through multi-component files is real.
 - Organize by feature/domain (`features/invoices/`), not by type (`components/buttons/`).
 - Page components are thin orchestrators — they compose feature components, not contain business logic.
 - Extract custom hooks for any reusable stateful logic — never duplicate state patterns across components.
 - Each hook does one thing — no god-hooks managing multiple unrelated concerns.
 - Keep forms, validation schemas, and default values in separate files from form UI components.
 - Side effects live in hooks, not scattered through event handlers and render bodies.
+
+## CRITICAL — Props Naming
+
+- Always domain-prefix the props interface: `DocumentViewerHeaderProps`, `PaymentRowProps`, `ImageBodyProps`. Never name a props interface just `Props` — when two such interfaces are imported into the same file (or surface in IDE rename / type-search), they collide silently.
+- Always export the props interface (`export interface FooProps`). Callers may need to reference the type without redeclaring; non-exported props turn into "anonymous shape duplicated at the call site" anti-pattern.
+- The component's props interface is the one allowed exception to "one type per file" — it can be co-located with the component because it's tightly coupled and never reused independently. Any OTHER interface in a component file is a smell — split it out.
+
+## CRITICAL — Conditional Rendering
+
+- Reach for early returns + discriminated unions before reaching for nested ternaries. Nested ternaries in JSX are unreadable past 2 levels — every reader has to mentally evaluate the chain to figure out what actually renders.
+- One ternary per JSX expression is fine. Two is suspicious. Three or more is almost always wrong — refactor.
+- For complex multi-state rendering, the canonical pattern is: (a) a `useXxxMode` hook that returns a discriminated union (`'loading' | 'error' | 'empty' | 'pdf' | …`), (b) a single `switch` over the mode in the body component, (c) one subcomponent per state, each in its own file. The body becomes a flat dispatcher; state-specific markup is owned by the subcomponent that renders it.
+- Acceptable compact ternary: a class-name toggle, a "value or fallback string" expression, a single boolean disclosure (`{open ? <Body /> : null}`).
+- Unacceptable: chains like `cond1 ? <A /> : cond2 ? <B /> : cond3 ? <C /> : <D />`, nested ternaries inside JSX prop values, ternaries that change layout structure (different containers, different grid shapes).
+
+## CRITICAL — Inline Type Shapes
+
+- Whenever a `useState<{...}>`, callback parameter, or return value uses an anonymous object shape with 2+ named fields, extract it to a named interface in `shared/types/<domain>/<thing>.ts` and import.
+- The anti-pattern: `const [viewing, setViewing] = useState<{ documentId: string; transactionId: string } | null>(null)`. The fix: `interface DocumentViewTarget` in `shared/types/document/document-view-target.ts`, then `useState<DocumentViewTarget | null>(null)`.
+- Why: anonymous shapes can't be re-used, can't be referenced from other files, and the field set tends to drift between callers as fields are added. Named interfaces are documentation, single-source-of-truth, and refactor-safe.
+- One named type per file. File name matches the type name in kebab-case.
+
+## CRITICAL — Truthy / Null Checks
+
+- `if (!blob)` over `if (blob === null)` when the type is `T | null` and `T` is always truthy (object, non-empty string, non-zero number). Same for `!error` when `error: string | null` (empty error string is not a valid value).
+- Reserve explicit `=== null` / `!== null` for cases where the falsy check would over-match — e.g. distinguishing `null` from `""` (where empty string is a valid value), `null` from `0` (where zero is meaningful), or `null` from `undefined` (when they semantically differ — set vs. never-set).
+- Same for `=== undefined`: only when undefined and null are semantically distinct.
+- Never use `=== true` / `=== false` — `if (x)` and `if (!x)` are sufficient. Booleans are booleans.
 
 ## CRITICAL — State Management
 
