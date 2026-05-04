@@ -9,6 +9,7 @@
 - Never use hacks or workarounds — always prefer the cleaner, more elegant, and robust approach even if it takes more effort upfront.
 - Don't duplicate code — extract repeated logic into a shared function or module rather than copying it.
 - Always remove unused code, files, directories, imports, type exports, and stale references when making changes — don't leave dead code or orphaned references behind.
+- Fail loud on environmental misconfiguration. Missing env vars or unconfigured external dependencies must crash the app at boot — let the lifespan raise, the deploy healthcheck catch it, the rollout abort. Never wrap external-resource initialization in `try/except: pass` "graceful degradation" that hides misconfig as null fields or placeholders in API responses. Distinguish config-time faults (crash) from runtime outages (best-effort log+continue is acceptable only when the failure mode is recoverable AND visibility is preserved); never use the runtime pattern for config-time problems. When inheriting a graceful-degradation pattern from a low-stakes use case into a higher-stakes one, explicitly re-evaluate — the default for any path touching authoritative business data is fail loud.
 
 ### Typing & Structure
 - Always use strict typing. Avoid `any`, implicit types, or loose type definitions.
