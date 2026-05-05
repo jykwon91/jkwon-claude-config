@@ -55,6 +55,7 @@ Low. The reviewer is checking that the diff matches the description, not relitig
 - Choosing between multiple valid library options (FastAPI vs Flask, argon2 vs bcrypt)
 - Memory-curation thresholds (how aggressive, how often)
 - Promoting a memory from auto-memory to a global preference (does it generalize? you decide)
+- **Infra-wiring** changes spanning Dockerfile + docker-compose + deploy workflow (build-arg propagation, env-file flag, multi-stage build order). These are subjective in the sense that the operator chooses the wiring shape, but they carry an extra constraint: the PR description MUST include an "Operational migration required" block per `rules/pr-operational-migration.md` so the operator knows what to update on the VPS before the next deploy.
 
 ### Review bar
 
