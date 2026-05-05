@@ -2,6 +2,17 @@
 
 Apply these patterns when the project uses FastAPI. Detect from `fastapi` in `requirements.txt` or `pyproject.toml`.
 
+## CRITICAL — Monorepo Discipline
+
+See `rules/monorepo-parity-discipline.md` for the full discipline. The FastAPI-specific rules:
+
+- Security primitives (auth, RBAC, encryption, audit, rate limiting, account lockout, TOTP, CAPTCHA, HIBP) must NEVER be reimplemented per-app — extract to a shared package and import. **Reinventing security is a security defect.**
+- App-bootstrap shape (`Settings` class, lifespan, env contract) must be shared via base classes, not copy-pasted. Use a `BaseAppSettings` Pydantic class in the shared package; subclass per app for app-specific fields. `database_url_sync` and similar derived values should be `@property` on the base, not a required env field per-app.
+- Lifespan steps (Sentry init, boot guards, bucket initializers, DB pool teardown) must be composed via a shared `create_app_lifespan(settings)` factory. Each new lifespan step is added once in the factory; all apps inherit. Adding a step in only one app is drift.
+- When you find duplication of security or operational shape across 2+ apps in a monorepo, the PR introducing the second occurrence MUST extract to shared in the same commit. Never deferred to TECH_DEBT.
+- Schema conventions (UUID PKs, timezone-aware timestamps, tenant `user_id` FK with CASCADE+index, `String` + `CheckConstraint` enums never SQLAlchemy `Enum`, `EncryptedString` for PII, partial unique indexes for soft-delete uniqueness) must be enforced in every new table. Violating a convention is a bug, not a style preference.
+- Common table schemas (users, auth_events, audit_logs, organizations, members, sessions) belong in the shared package. Per-app reimplementations of these tables — even with cosmetic differences like `users` vs `user` plural — are drift.
+
 ## CRITICAL — Layered Architecture
 
 - **Route handlers** are thin wrappers — they validate input, call a service, and return a response. No business logic.

@@ -2,6 +2,16 @@
 
 Apply these patterns when the project uses React. Detect React from `package.json` dependencies (`react`, `react-dom`).
 
+## CRITICAL — Monorepo Discipline
+
+See `rules/monorepo-parity-discipline.md` for the full discipline. The React-specific rules:
+
+- In monorepos with multiple apps that share a UI component library: layout shells (`AppShell` or equivalent), theme bootstrap (`localStorage.<key>` + prefers-color-scheme), Tailwind dark variants, page wrappers (centered max-width container), skeleton loading patterns, toast usage, empty-state structures, and auth pages (Login / Register / ForgotPassword / ResetPassword / VerifyEmail / Security / Settings / Account Deletion) must be inherited from the shared package or template, not copy-pasted per app.
+- When adding a new shared UI primitive (a new dialog, a new badge variant, a new form pattern), the PR adding it must place it in the shared component library (`@platform/ui` or equivalent). Per-app local copies are a defect — even when "it's just one component, we can extract later."
+- App-local frontend code is restricted to: pages that render domain-specific data, feature components for that domain, domain-specific empty-state copy, domain-specific RTK Query / React Query slices. **Auth pages, settings pages, layout shells, and shared UI primitives are NOT app-local.** If you find yourself writing one of these in a non-canonical app, stop and check the canonical for the matching component to import or mirror.
+- When the canonical app has a layout/UX pattern that the new app should adopt, BEFORE writing fresh code in the new app, open the matching canonical file and copy its structure. The default for any non-domain-specific frontend file in a non-canonical app is byte-identical to the canonical app's matching file (modulo names/ports/domain).
+- The litmus test for any non-canonical-app frontend file: "Could a stranger tell this wasn't the canonical app?" If yes for any reason other than name/port/domain or new domain code, that's drift.
+
 ## CRITICAL — Component Architecture
 
 - One component per file — never define multiple components in the same file. This includes presentational helpers ("just two lines, only used once below") — split them. The cost of an extra file is ~zero; the cost of grep-hunting through multi-component files is real.
