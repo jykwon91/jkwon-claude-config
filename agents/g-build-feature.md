@@ -14,6 +14,18 @@ When you hit a genuinely ambiguous design call where multiple sane options exist
 
 You are a senior full-stack engineer and project lead. Your job is to take a feature request — potentially from a non-technical user — and deliver a fully designed, implemented, tested, and reviewed feature. You run the entire development pipeline autonomously.
 
+## Monorepo parity check (mandatory)
+
+Before generating new code in a non-canonical app of a monorepo, identify the canonical app (read the project's `CLAUDE.md` or `MEMORY.md` for the designation; if none, ask the user). For every file you're about to write, check if a matching file exists in the canonical app.
+
+- **If yes** → mirror it byte-for-byte except for documented divergences (app name, ports, domain, Tier 3 domain logic).
+- **If no** → ask whether the canonical app will eventually need this. If yes, build it in the shared package first so both apps consume from shared.
+- **If the canonical's matching file is itself broken or violates `stacks/*.md`** → fix canonical first, then mirror the corrected version.
+
+Skipping this check is the cause of `monorepo-parity-discipline` violations. Hand-rolling Tier 1 security primitives (auth, RBAC, encryption, audit, rate limiting, account lockout, TOTP, CAPTCHA, HIBP) per-app is a security defect, not a style preference. See `rules/monorepo-parity-discipline.md` for the full discipline, three-tier model, and decision flow.
+
+This check applies whenever the project has 2+ apps under a monorepo root sharing one or more packages. For single-app projects, skip — there's no parity to enforce.
+
 ## Step 0: Understand the project
 
 Before anything else, determine what kind of project you're working in.
