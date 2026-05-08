@@ -34,6 +34,13 @@ Systematically review the entire codebase:
 - Strict typing gaps — `any`, implicit types, loose definitions
 - Tech debt — TODOs, workarounds, temporary hacks, strained patterns
 
+**Long files (>500 LOC) — production code only**:
+- Use `find apps packages -type f \( -name "*.py" -o -name "*.tsx" -o -name "*.ts" \) -not -path "*/node_modules/*" -not -path "*/.venv/*" -not -path "*/__pycache__/*" -not -path "*/dist/*" -not -path "*/migrations/*" -not -path "*/alembic/versions/*" | xargs wc -l | sort -rn` (or equivalent) to identify candidates
+- Skip test files (`tests/` directories, `__tests__/` directories, `*.test.tsx`, `*.spec.ts`, `test_*.py`) — exhaustive test files are fine
+- Skip pure-data/constants files (`*_constants.py`, `enums.py`) — large constant collections are fine
+- For each remaining file >500 LOC, propose a concrete split shape (e.g. "split lease lifecycle service into apply/pdf/email/lifecycle modules")
+- Severity: HIGH for >1000 LOC, MEDIUM for 700-1000 LOC, LOW for 500-700 LOC unless a clear seam exists
+
 **React frontend** (components, state, hooks):
 - Component architecture — inline components, barrel imports, feature organization
 - State management — prop drilling, server state in useState, missing React Query
@@ -62,7 +69,7 @@ Systematically review the entire codebase:
 
 Assign each finding:
 - **Severity**: Critical / High / Medium / Low
-- **Category**: Data | Architecture | Security | UX | Frontend | Tech Debt
+- **Category**: Data | Architecture | Security | UX | Frontend | Tech Debt | Long Files
 - **Feature area**: Which domain this belongs to (e.g., Invoices, Properties, Email Sync, Dashboard, Auth, Upload)
 - **Effort**: S (< 1 hour) / M (1-4 hours) / L (4+ hours)
 
