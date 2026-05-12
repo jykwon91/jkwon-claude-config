@@ -173,12 +173,41 @@ EOF
 After the bundle PR is open, close each replaced dependabot PR with a one-liner comment so the dependabot bot doesn't keep rebasing them:
 
 ```bash
-for n in X Y Z; do
-  gh pr close "$n" --comment "Superseded by #<bundle-pr-number> (bundled to avoid lockfile conflicts)."
+BUNDLE_PR=<bundle-pr-number>
+SUPERSEDED=(X Y Z)  # original dependabot PR numbers ONLY
+for n in "${SUPERSEDED[@]}"; do
+  # Safety: never close the bundle PR itself, and never close a PR with a
+  # branch name pattern that doesn't look like a dependabot branch.
+  if [ "$n" = "$BUNDLE_PR" ]; then
+    echo "REFUSING to close bundle PR #$n — this is a bug in the SUPERSEDED list" >&2
+    exit 2
+  fi
+  HEAD=$(gh pr view "$n" --json headRefName --jq .headRefName)
+  case "$HEAD" in
+    dependabot/*) ;;
+    *)
+      echo "REFUSING to close PR #$n — head '$HEAD' is not a dependabot branch" >&2
+      exit 2
+      ;;
+  esac
+  gh pr close "$n" --comment "Superseded by #${BUNDLE_PR} (bundled to avoid lockfile conflicts)."
 done
 ```
 
+The safety guard exists because on 2026-05-12, a previous bundle run closed two sibling super-PRs (#597, #599) as a side effect of running cleanup-after-merge with a non-dependabot branch pattern. The guard makes the agent refuse to close anything that isn't both (a) explicitly in the SUPERSEDED list and (b) actually a `dependabot/*` branch.
+
 If you used `Replaces #X, #Y, #Z` in the title and dependabot lockfile changes are fully subsumed by the bundle, dependabot will close them automatically once the bundle merges — but explicit closes are friendlier and unblock the dependabot queue immediately.
+
+### Step 9: Cleanup constraints (after merge)
+
+When merging the bundle PR and running post-merge cleanup, OBSERVE these constraints:
+
+1. **`gh pr merge --admin --squash --delete-branch <bundle-pr>` ONLY** — the `--delete-branch` flag deletes only the merged PR's own head branch. Do NOT separately run `git push origin --delete <branch>` on any other branch in the same agent run.
+2. **Do NOT iterate `git branch --merged main` cleanup across multiple bundle branches.** Each bundle PR's post-merge cleanup must touch only ITS OWN merged branch. If you have other open bundle PRs from this same agent run, leave their branches alone — merge them one at a time.
+3. **Do NOT run pattern-matched branch deletes** (e.g., `git branch -D chore/jykwon91/*-deps` or any wildcard expansion). Always reference branches by exact name.
+4. **Serialize bundle opens.** Open ONE bundle PR, wait for green, admin-merge, then open the next. Opening N bundle PRs in parallel triggered the 2026-05-12 sibling-close incident — the workaround is sequencing, not parallel speedup.
+
+Violations of these constraints close legitimate work as a side effect (the bug fixed in this revision).
 
 ## Decision-making
 
