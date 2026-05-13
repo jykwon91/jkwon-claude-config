@@ -201,11 +201,23 @@ setup_mcp_servers() {
 setup_mcp_servers
 
 # --- Merge shared hooks into ~/.claude/settings.json ---
+# The merge logic lives in install/merge-settings.py — see that file for the
+# detailed contract. Summary: a sidecar at $DEST/.jkwon-config-managed-hooks.json
+# tracks which hook entries were installed by this config so subsequent runs
+# can remove stale ones (renames, arg changes, removals, if-field changes).
+# First-run migration also wipes any hook whose command references the config
+# hooks dir, cleaning up duplicates left by the old installer.
 setup_shared_hooks() {
   local shared_settings="$SCRIPT_DIR/settings.json"
   local user_settings="$DEST/settings.json"
+  local sidecar="$DEST/.jkwon-config-managed-hooks.json"
+  local merge_script="$SCRIPT_DIR/install/merge-settings.py"
 
   [ -f "$shared_settings" ] || return
+  if [ ! -f "$merge_script" ]; then
+    echo "  WARNING: $merge_script not found — cannot merge shared hooks"
+    return
+  fi
 
   if ! command -v py &>/dev/null && ! command -v python3 &>/dev/null; then
     echo "  WARNING: Python not found — cannot merge shared hooks into settings.json"
@@ -215,57 +227,12 @@ setup_shared_hooks() {
   local py_cmd="py"
   command -v py &>/dev/null || py_cmd="python3"
 
-  $py_cmd - "$shared_settings" "$user_settings" << 'PYMERGE'
-import sys, json, os
-
-shared_path, user_path = sys.argv[1], sys.argv[2]
-
-with open(shared_path) as f:
-    shared = json.load(f)
-
-user = {}
-if os.path.exists(user_path):
-    with open(user_path) as f:
-        user = json.load(f)
-
-# Merge hooks: for each event+matcher, replace shared hooks by their "if" field.
-# This ensures updated hooks replace old versions instead of duplicating.
-shared_hooks = shared.get("hooks", {})
-user_hooks = user.setdefault("hooks", {})
-
-for event, entries in shared_hooks.items():
-    existing = user_hooks.setdefault(event, [])
-    for entry in entries:
-        matcher = entry.get("matcher")
-        # Find or create the entry with the same matcher
-        matched_entry = next((e for e in existing if e.get("matcher") == matcher), None)
-        if not matched_entry:
-            existing.append(entry)
-            continue
-
-        # For each shared hook, replace any existing hook with the same "if" field
-        for shared_hook in entry.get("hooks", []):
-            if_field = shared_hook.get("if")
-            if if_field:
-                # Remove any existing hook with the same "if" trigger
-                matched_entry["hooks"] = [
-                    h for h in matched_entry["hooks"]
-                    if h.get("if") != if_field
-                ]
-            else:
-                # No "if" field — check by exact command match
-                cmd = shared_hook.get("command", "")
-                if any(cmd == h.get("command", "") for h in matched_entry["hooks"]):
-                    continue
-            matched_entry["hooks"].append(shared_hook)
-
-with open(user_path, "w") as f:
-    json.dump(user, f, indent=2)
-    f.write("\n")
-
-PYMERGE
-
-  echo "  Shared hooks merged into settings.json"
+  local result
+  if result="$("$py_cmd" "$merge_script" "$shared_settings" "$user_settings" "$sidecar" 2>&1)"; then
+    echo "  Shared hooks merged into settings.json ($result)"
+  else
+    echo "  WARNING: hook merge failed: $result"
+  fi
 }
 
 setup_shared_hooks
