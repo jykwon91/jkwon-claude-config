@@ -396,6 +396,103 @@ class MergeSettingsCase(unittest.TestCase):
         sidecar = self.read_sidecar()
         self.assertEqual(len(sidecar["managed_hooks"]), 1)
 
+    # --- First-run signature heuristic catches inline duplicates -----------
+
+    def test_first_run_signature_catches_inline_mojibake_duplicate(self):
+        # Pre-existing user settings simulate the bug seen in the wild:
+        # a stale inline agent hook with mojibake bytes (UTF-8 round-tripped
+        # through cp1252) sits alongside the canonical one. The path heuristic
+        # cannot see it because there's no $HOME/.claude/hooks/ reference.
+        # Same (event, matcher, if, type) as the current shared hook, so the
+        # signature heuristic catches it.
+        canonical_prompt = "Pipeline quality gate — do the thing"
+        mojibake_prompt = "Pipeline quality gate â€” do the thing"
+        self.write(
+            self.user_path,
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [
+                                {
+                                    "type": "agent",
+                                    "if": "Bash(gh pr create*)",
+                                    "prompt": mojibake_prompt,
+                                    "timeout": 120,
+                                },
+                                {
+                                    "type": "command",
+                                    "command": "echo my-own-hook",
+                                },
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+        self.write(
+            self.shared_path,
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [
+                                {
+                                    "type": "agent",
+                                    "if": "Bash(gh pr create*)",
+                                    "prompt": canonical_prompt,
+                                    "timeout": 120,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+        self.run_merge()
+        user = self.read_user()
+        hooks = user["hooks"]["PreToolUse"][0]["hooks"]
+        # mojibake variant wiped; user-added preserved; canonical added.
+        prompts = [h.get("prompt") for h in hooks if h.get("type") == "agent"]
+        commands = [h.get("command") for h in hooks if h.get("type") == "command"]
+        self.assertEqual(prompts, [canonical_prompt])
+        self.assertIn("echo my-own-hook", commands)
+        self.assertNotIn(mojibake_prompt, prompts)
+
+    # --- Signature heuristic does NOT wipe truly user-only hooks ------------
+
+    def test_first_run_signature_preserves_user_hooks_with_no_match(self):
+        # User has a hook with an `if` field that doesn't exist in shared.
+        # Must survive first-run cleanup.
+        self.write(
+            self.user_path,
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "if": "Bash(rm -rf*)",
+                                    "command": "echo dangerous-rm-blocker",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+        self.write(self.shared_path, {"hooks": {}})
+        self.run_merge()
+        user = self.read_user()
+        # User's hook survives — no signature collision with shared
+        hooks = user["hooks"]["PreToolUse"][0]["hooks"]
+        self.assertEqual(len(hooks), 1)
+        self.assertEqual(hooks[0]["command"], "echo dangerous-rm-blocker")
+
     # --- Tilde-form path also matched in first-run migration ----------------
 
     def test_first_run_migration_matches_tilde_form(self):

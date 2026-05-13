@@ -26,10 +26,15 @@ Prints a one-line summary like `5 managed, +2 added, -1 stale removed`.
   untouched.
 - **Stale managed hooks removed**: any hook entry whose hash matches the
   previous sidecar but not the current shared config is dropped.
-- **First-run migration**: when no sidecar exists, any hook whose command
-  references the config hooks directory (`$HOME/.claude/hooks/` or
-  `~/.claude/hooks/`) is wiped before the merge. This cleans up
-  duplicates left by the old installer for users upgrading.
+- **First-run migration**: when no sidecar exists, two heuristics wipe
+  stale hooks before the merge:
+  - Any hook whose command references the config hooks directory
+    (`$HOME/.claude/hooks/` or `~/.claude/hooks/`).
+  - Any hook with an `if` field whose `(event, matcher, if, type)` matches
+    a current shared hook (catches inline-script duplicates the path
+    heuristic can't see — mojibake, whitespace drift, refactors). The
+    `if` field is required for this match to fire; without it the
+    coordinates would over-match legitimate user hooks.
 
 ### What is NOT a user-editable file
 
@@ -46,5 +51,6 @@ local hook entry (with a command that doesn't reference
 python install/test_merge_settings.py
 ```
 
-12 cases cover each failure mode the previous inline merge missed, plus
-idempotency, user-added preservation, and the first-run migration.
+14 cases cover each failure mode the previous inline merge missed, plus
+idempotency, user-added preservation, both first-run migration heuristics,
+and the signature heuristic's no-`if` carve-out that protects user hooks.
