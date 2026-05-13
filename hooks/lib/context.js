@@ -71,15 +71,33 @@ function readFreshMetrics(sessionId, maxAgeSeconds) {
   return m;
 }
 
+// Highest precedence: explicit user override read from ~/.claude/settings.json.
+// Claude Code passes the settings.json `env` block to Bash *tool* subprocesses
+// but NOT to *hook* subprocesses, so `process.env.CLAUDE_CONTEXT_WINDOW` is
+// always undefined here regardless of what the user configured. The reliable
+// path is to read settings.json from disk on every invocation.
+function readContextWindowFromSettings() {
+  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+  try {
+    const cfg = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const raw = cfg && cfg.env && cfg.env.CLAUDE_CONTEXT_WINDOW;
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch (e) {
+    // missing file, parse error, permission error — fall through to model lookup
+  }
+  return null;
+}
+
 function resolveContextWindow(modelId) {
-  // Highest precedence: explicit user override. The PostToolUse hook payload
-  // doesn't include model info, and even when it does (statusline), the model
-  // id is the bare `claude-opus-4-7` regardless of whether the user is on the
-  // 200K default or the 1M variant — the 1M tier is enabled via a beta
-  // header, not the model id. So users on 1M MUST set this env var or the
-  // hook will measure them against the 200K default and fire false CRITICAL.
-  const envVal = parseInt(process.env.CLAUDE_CONTEXT_WINDOW, 10);
-  if (Number.isFinite(envVal) && envVal > 0) return envVal;
+  // The PostToolUse hook payload doesn't include model info, and even when it
+  // does (statusline), the model id is the bare `claude-opus-4-7` regardless
+  // of whether the user is on the 200K default or the 1M variant — the 1M
+  // tier is enabled via a beta header, not the model id. So users on 1M MUST
+  // set CLAUDE_CONTEXT_WINDOW in their settings.json `env` block or the hook
+  // will measure them against the 200K default and fire false CRITICAL.
+  const fromSettings = readContextWindowFromSettings();
+  if (fromSettings) return fromSettings;
 
   if (!modelId) return DEFAULT_WINDOW;
   const key = String(modelId).toLowerCase();
@@ -159,6 +177,7 @@ module.exports = {
   writeJson,
   nowSeconds,
   readFreshMetrics,
+  readContextWindowFromSettings,
   resolveContextWindow,
   computeMetrics,
   getOrComputeMetrics,

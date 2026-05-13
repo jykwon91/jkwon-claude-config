@@ -49,18 +49,37 @@ function clearSidecar(sessionId) {
   }
 }
 
-function runHook(script, payload, env) {
-  const result = spawnSync('node', [script], {
-    input: JSON.stringify(payload),
-    encoding: 'utf8',
-    timeout: 10000,
-    env: { ...process.env, ...(env || {}) },
-  });
-  return {
-    stdout: result.stdout || '',
-    stderr: result.stderr || '',
-    status: result.status,
-  };
+// Run the hook with HOME/USERPROFILE pointed at an isolated empty temp dir so
+// the hook never reads the developer's real ~/.claude/settings.json. If a
+// settings object is supplied, write it to <isolatedHome>/.claude/settings.json
+// so the hook picks it up via readContextWindowFromSettings().
+function runHook(script, payload, { settings, env } = {}) {
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), `claude-test-home-${process.pid}-`));
+  if (settings) {
+    const claudeDir = path.join(isolatedHome, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify(settings));
+  }
+  try {
+    const result = spawnSync('node', [script], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        USERPROFILE: isolatedHome,
+        ...(env || {}),
+      },
+    });
+    return {
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      status: result.status,
+    };
+  } finally {
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
 }
 
 function expect(cond, msg) {
@@ -241,9 +260,11 @@ console.log('Context monitor + statusline smoke tests\n');
   });
 }
 
-// --- Env var override: CLAUDE_CONTEXT_WINDOW=1000000 silences warning at the
-// same byte count that would warn on a 200K window. This is the fix for users
-// on the 1M-context variant of Opus / Sonnet (model id alone doesn't say). ---
+// --- settings.json override: CLAUDE_CONTEXT_WINDOW=1000000 silences warning
+// at the same byte count that would warn on a 200K window. This is the fix
+// for users on the 1M-context variant of Opus / Sonnet — settings.json `env`
+// block isn't forwarded to hook subprocesses, so the hook reads it from disk
+// instead of process.env. ---
 {
   const sid = uniqSession('8');
   const t = genTranscript(500_000);
@@ -258,10 +279,10 @@ console.log('Context monitor + statusline smoke tests\n');
         hook_event_name: 'PostToolUse',
         model: { id: 'claude-opus-4-7' },
       },
-      { CLAUDE_CONTEXT_WINDOW: '1000000' }
+      { settings: { env: { CLAUDE_CONTEXT_WINDOW: '1000000' } } }
     );
-    test('monitor: env var CLAUDE_CONTEXT_WINDOW=1000000 -> no warning at 500K bytes', () => {
-      expect(!out.stdout.trim(), `expected empty stdout with 1M env override, got: ${out.stdout.slice(0, 200)}`);
+    test('monitor: settings.json CLAUDE_CONTEXT_WINDOW=1000000 -> no warning at 500K bytes', () => {
+      expect(!out.stdout.trim(), `expected empty stdout with 1M settings override, got: ${out.stdout.slice(0, 200)}`);
     });
   } finally {
     fs.unlinkSync(t);
@@ -269,7 +290,7 @@ console.log('Context monitor + statusline smoke tests\n');
   }
 }
 
-// --- Env var override: invalid value falls back to default 200K. ---
+// --- settings.json override: invalid value falls back to default 200K. ---
 {
   const sid = uniqSession('9');
   const t = genTranscript(500_000);
@@ -284,10 +305,35 @@ console.log('Context monitor + statusline smoke tests\n');
         hook_event_name: 'PostToolUse',
         model: { id: 'claude-opus-4-7' },
       },
-      { CLAUDE_CONTEXT_WINDOW: 'not-a-number' }
+      { settings: { env: { CLAUDE_CONTEXT_WINDOW: 'not-a-number' } } }
     );
     test('monitor: invalid CLAUDE_CONTEXT_WINDOW falls back -> still warns at 500K bytes', () => {
-      expect(/WARNING|CRITICAL/.test(out.stdout), `expected warning when env override invalid, got: ${out.stdout.slice(0, 200)}`);
+      expect(/WARNING|CRITICAL/.test(out.stdout), `expected warning when settings override invalid, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    fs.unlinkSync(t);
+    clearSidecar(sid);
+  }
+}
+
+// --- settings.json missing entirely: hook silently falls back to model lookup.
+// Regression guard against an earlier draft that crashed when settings.json
+// didn't exist. ---
+{
+  const sid = uniqSession('10');
+  const t = genTranscript(10_000);
+  try {
+    const out = runHook(MONITOR, {
+      session_id: sid,
+      transcript_path: t,
+      cwd: HOOKS_DIR,
+      tool_name: 'Bash',
+      hook_event_name: 'PostToolUse',
+      model: { id: 'claude-opus-4-7' },
+    });
+    test('monitor: missing settings.json -> no warning at low usage, no crash', () => {
+      expect(!out.stdout.trim(), `expected empty stdout, got: ${out.stdout.slice(0, 200)}`);
+      expect(!out.stderr.match(/Error|throw|Cannot read/), `expected no error in stderr, got: ${out.stderr.slice(0, 200)}`);
     });
   } finally {
     fs.unlinkSync(t);
