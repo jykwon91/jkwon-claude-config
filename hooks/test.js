@@ -755,5 +755,263 @@ function runReadScanner(payload) {
   }
 }
 
+// =====================================================================
+// state-update-reminder hook tests
+// =====================================================================
+
+const STATE_REMINDER = path.join(HOOKS_DIR, 'state-update-reminder.js');
+
+function projectHashFromCwd(cwd) {
+  return cwd.replace(/[\\/:]/g, '-');
+}
+
+function sidecarFile(sessionId) {
+  return path.join(os.tmpdir(), `claude-state-reminder-${sessionId}.json`);
+}
+
+function clearStateSidecar(sessionId) {
+  try {
+    fs.unlinkSync(sidecarFile(sessionId));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// Run the state-update-reminder hook with an isolated HOME that contains a
+// STATE.md (or doesn't, when `stateContent` is null). Optionally pre-write a
+// sidecar with the given shape.
+function runStateReminder({
+  toolName = 'Edit',
+  cwd = 'C:\\Users\\test\\project',
+  sessionId,
+  stateContent = '# State\nWorking on X.',
+  stateMtimeAgoMs = 60 * 60 * 1000, // 1 hour ago by default
+  sidecar = null,
+} = {}) {
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), `claude-state-home-${process.pid}-`));
+
+  if (stateContent !== null) {
+    const hash = projectHashFromCwd(cwd);
+    const stateDir = path.join(isolatedHome, '.claude', 'projects', hash);
+    fs.mkdirSync(stateDir, { recursive: true });
+    const stateFile = path.join(stateDir, 'STATE.md');
+    fs.writeFileSync(stateFile, stateContent);
+    const targetMtime = (Date.now() - stateMtimeAgoMs) / 1000;
+    fs.utimesSync(stateFile, targetMtime, targetMtime);
+  }
+
+  if (sidecar) {
+    fs.writeFileSync(sidecarFile(sessionId), JSON.stringify(sidecar));
+  }
+
+  try {
+    const result = spawnSync('node', [STATE_REMINDER], {
+      input: JSON.stringify({
+        tool_name: toolName,
+        hook_event_name: 'PostToolUse',
+        session_id: sessionId,
+        cwd,
+        tool_input: {},
+      }),
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome },
+    });
+    return {
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      status: result.status,
+      sidecar: (() => {
+        try { return JSON.parse(fs.readFileSync(sidecarFile(sessionId), 'utf8')); }
+        catch { return null; }
+      })(),
+    };
+  } finally {
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
+}
+
+// --- non-modifying tool: no-op ---
+{
+  const sid = uniqSession('state-1');
+  try {
+    const out = runStateReminder({ toolName: 'Bash', sessionId: sid });
+    test('state-reminder: non-modifying tool -> no-op', () => {
+      expect(!out.stdout.trim(), `expected empty, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- STATE.md doesn't exist: no-op ---
+{
+  const sid = uniqSession('state-2');
+  try {
+    const out = runStateReminder({ sessionId: sid, stateContent: null });
+    test('state-reminder: no STATE.md -> no-op', () => {
+      expect(!out.stdout.trim(), `expected empty, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- STATE.md exists, first call (count=1 < REMIND_AFTER_CALLS): no-op ---
+{
+  const sid = uniqSession('state-3');
+  try {
+    const out = runStateReminder({ sessionId: sid });
+    test('state-reminder: first call below warm-up threshold -> no-op', () => {
+      expect(!out.stdout.trim(), `expected empty, got: ${out.stdout.slice(0, 200)}`);
+      expect(out.sidecar && out.sidecar.call_count === 1, `expected call_count=1, got: ${JSON.stringify(out.sidecar)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- 10th call after no remind, STATE stale: reminder fires ---
+{
+  const sid = uniqSession('state-4');
+  try {
+    const out = runStateReminder({
+      sessionId: sid,
+      sidecar: { call_count: 9, last_remind_at_call: 0, last_state_mtime: null },
+    });
+    test('state-reminder: 10th call with stale STATE -> reminder', () => {
+      expect(/STATE\.md was last updated/.test(out.stdout), `expected reminder, got: ${out.stdout.slice(0, 300)}`);
+      expect(/additionalContext/.test(out.stdout), `expected JSON envelope, got: ${out.stdout.slice(0, 200)}`);
+      expect(out.sidecar && out.sidecar.last_remind_at_call === 10, `expected last_remind_at_call=10, got: ${JSON.stringify(out.sidecar)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- STATE.md was just updated (mtime > last_state_mtime): no-op + tracks mtime ---
+{
+  const sid = uniqSession('state-5');
+  try {
+    // Sidecar says we saw mtime X; STATE.md actually has mtime Y > X (touched after baseline)
+    const olderBaseline = Date.now() - 10 * 60 * 1000;
+    const out = runStateReminder({
+      sessionId: sid,
+      stateMtimeAgoMs: 60 * 1000, // 1 minute ago — newer than baseline
+      sidecar: { call_count: 50, last_remind_at_call: 0, last_state_mtime: olderBaseline },
+    });
+    test('state-reminder: STATE touched this session -> quiet + tracks mtime', () => {
+      expect(!out.stdout.trim(), `expected empty (STATE was touched), got: ${out.stdout.slice(0, 200)}`);
+      expect(out.sidecar && out.sidecar.last_state_mtime > olderBaseline, `expected mtime advance, got: ${JSON.stringify(out.sidecar)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- debounce: reminded recently, next call suppressed ---
+{
+  const sid = uniqSession('state-6');
+  try {
+    // Baseline must be at or after the file's mtime so the "STATE was touched
+    // this session" branch doesn't fire. Use Date.now() (newer than the
+    // 1-hour-old file mtime). This makes stateMtimeMs (1h ago) < baseline (now)
+    // so the touched branch is skipped and we hit the debounce check.
+    const out = runStateReminder({
+      sessionId: sid,
+      stateMtimeAgoMs: 60 * 60 * 1000,
+      sidecar: { call_count: 15, last_remind_at_call: 10, last_state_mtime: Date.now() },
+    });
+    test('state-reminder: within debounce window -> suppressed', () => {
+      expect(!out.stdout.trim(), `expected empty (debounced), got: ${out.stdout.slice(0, 200)}`);
+      expect(out.sidecar && out.sidecar.last_remind_at_call === 10, `expected last_remind_at_call unchanged, got: ${JSON.stringify(out.sidecar)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- past debounce window: reminder fires again ---
+{
+  const sid = uniqSession('state-7');
+  try {
+    const out = runStateReminder({
+      sessionId: sid,
+      stateMtimeAgoMs: 60 * 60 * 1000,
+      sidecar: { call_count: 31, last_remind_at_call: 10, last_state_mtime: Date.now() },
+    });
+    test('state-reminder: past debounce -> fires again', () => {
+      expect(/STATE\.md was last updated/.test(out.stdout), `expected reminder, got: ${out.stdout.slice(0, 300)}`);
+      expect(out.sidecar && out.sidecar.last_remind_at_call === 32, `expected last_remind_at_call=32, got: ${JSON.stringify(out.sidecar)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- missing cwd: no-op ---
+{
+  const sid = uniqSession('state-8');
+  try {
+    const out = runStateReminder({ sessionId: sid, cwd: '' });
+    test('state-reminder: missing cwd -> no-op', () => {
+      expect(!out.stdout.trim(), `expected empty, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    clearStateSidecar(sid);
+  }
+}
+
+// --- session_id with path traversal: rejected (no sidecar written outside tmpdir) ---
+{
+  const sid = '../escaped-state';
+  // Don't run via the helper since helper would write sidecar to a bogus path
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), `claude-state-home-${process.pid}-`));
+  const hash = projectHashFromCwd('C:\\Users\\test\\project');
+  const stateDir = path.join(isolatedHome, '.claude', 'projects', hash);
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.writeFileSync(path.join(stateDir, 'STATE.md'), '# state');
+  try {
+    const result = spawnSync('node', [STATE_REMINDER], {
+      input: JSON.stringify({
+        tool_name: 'Edit',
+        hook_event_name: 'PostToolUse',
+        session_id: sid,
+        cwd: 'C:\\Users\\test\\project',
+        tool_input: {},
+      }),
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome },
+    });
+    test('state-reminder: rejects session_id with path traversal', () => {
+      expect(!(result.stdout || '').trim(), `expected empty, got: ${(result.stdout || '').slice(0, 200)}`);
+      // Sanity: no sidecar should exist outside tmpdir
+      const evilPath = path.join(os.tmpdir(), '..', 'escaped-state.json');
+      expect(!fs.existsSync(evilPath), `sidecar escaped tmpdir: ${evilPath}`);
+    });
+  } finally {
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
+}
+
+// --- malformed JSON stdin: silent-fail ---
+{
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), `claude-state-home-${process.pid}-`));
+  try {
+    const result = spawnSync('node', [STATE_REMINDER], {
+      input: 'not json',
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome },
+    });
+    test('state-reminder: malformed stdin -> silent-fail', () => {
+      expect(!(result.stdout || '').trim(), `expected empty, got: ${(result.stdout || '').slice(0, 200)}`);
+    });
+  } finally {
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

@@ -12,6 +12,7 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 | `cleanup-after-merge.js` | `PostToolUse:Bash` hook | Yes |
 | `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `read-injection-scanner.js` | `PostToolUse:Read` hook | Yes |
+| `state-update-reminder.js` | `PostToolUse` hook (self-gates on Edit/Write/MultiEdit/NotebookEdit) | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
 | `lib/git-cmd.js` | Shared library (token-walk git-subcommand classifier) | n/a |
 | `test.js` | Cross-platform smoke tests | Run with `node hooks/test.js` |
@@ -154,13 +155,34 @@ Edit `isExcludedPath()` to extend.
 
 Failure modes (malformed JSON stdin, missing tool_response, etc.) all silent-fail with no output.
 
+## state-update-reminder
+
+PostToolUse hook that fires on file-modifying tools (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`). Reminds the agent to refresh the project's `STATE.md` when meaningful work has happened and the state file is stale. **Never blocks.**
+
+See `rules/working-state.md` for the full STATE.md convention. Summary: write `~/.claude/projects/<project-hash>/STATE.md` to capture in-flight work state across sessions; this hook nudges you to keep it current.
+
+**Behavior:**
+- Silent when STATE.md doesn't exist for this project (effectively opt-in by file presence)
+- Silent during the first 10 file modifications in the session (warm-up)
+- Silent when STATE.md has been touched in this session
+- Emits an advisory reminder on the first qualifying call after warm-up
+- Debounces reminders to once per 20 modifications
+
+**Project-hash resolution:** `cwd` with `\`, `/`, `:` all replaced with `-`. Matches Claude Code's `~/.claude/projects/` naming. Example: `C:\Users\me\Documents\Git\X` -> `C--Users-me-Documents-Git-X`.
+
+**Sidecar:** `$TMPDIR/claude-state-reminder-<session_id>.json` tracks call count, last reminder, last-seen STATE mtime per session.
+
+Tuning constants at top of `state-update-reminder.js`:
+- `REMIND_AFTER_CALLS` — warm-up threshold (default 10)
+- `DEBOUNCE_AFTER_REMIND` — calls between reminders (default 20)
+
 ## Running the tests
 
 ```bash
 node hooks/test.js
 ```
 
-Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file), validate-commit (valid + invalid + HEREDOC + env-prefix + -C path + full-path + malformed stdin), git-cmd unit tests, read-injection-scanner (clean + LOW + HIGH + invisible Unicode + path exclusions + structured tool_response + malformed stdin).
+Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file), validate-commit (valid + invalid + HEREDOC + env-prefix + -C path + full-path + malformed stdin), git-cmd unit tests, read-injection-scanner (clean + LOW + HIGH + invisible Unicode + path exclusions + structured tool_response + malformed stdin), state-update-reminder (no STATE / warm-up / fires / touched-this-session / debounce / past-debounce / path-traversal / malformed stdin).
 
 ## Tuning
 
