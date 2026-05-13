@@ -12,6 +12,13 @@
           },
           {
             "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "node $HOME/.claude/hooks/validate-commit.js",
+            "timeout": 5000,
+            "statusMessage": "Validating commit message format..."
+          },
+          {
+            "type": "command",
             "if": "Bash(git push:*)",
             "command": "node $HOME/.claude/hooks/check-pr-not-merged.js",
             "timeout": 10,

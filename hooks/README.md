@@ -8,7 +8,11 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 |---|---|---|
 | `context-monitor.js` | `PostToolUse` hook | Yes — registered via `settings.json` merge |
 | `context-statusline.js` | `statusLine` command | No — opt-in (see below) |
+| `check-pr-not-merged.js` | `PreToolUse:Bash(git push:*)` hook | Yes |
+| `cleanup-after-merge.js` | `PostToolUse:Bash` hook | Yes |
+| `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
+| `lib/git-cmd.js` | Shared library (token-walk git-subcommand classifier) | n/a |
 | `test.js` | Cross-platform smoke tests | Run with `node hooks/test.js` |
 
 ## context-monitor
@@ -77,13 +81,46 @@ To enable, add to `~/.claude/settings.json`:
 
 Output looks like: `ctx 23% (350K/1.0M) | MyFreeApps | Opus 4.7`. Indicators `!` at >=65% used and `!!` at >=75% used.
 
+## validate-commit
+
+PreToolUse hook on `Bash(git commit*)`. Blocks `git commit -m "..."` when the inline message doesn't match the expected shape; silent on anything else (interactive editor, `git status`, etc).
+
+Validation:
+- **Subject format**: `<type>(<scope>)?<!>?: <description>` — Conventional Commits, optional scope, optional `!` for breaking change.
+- **Allowed types** (constant at the top of `validate-commit.js`): `feat, fix, docs, style, refactor, perf, test, build, ci, chore, rule, infra`. The last two extend the standard set; they appear in this repo's commit history. Edit `ALLOWED_TYPES` to extend.
+- **Max subject length**: 100 chars. Edit `MAX_SUBJECT_LEN` to change.
+
+Self-gates inside the hook body via `lib/git-cmd.js` so the existing `if: "Bash(git commit*)"` matcher is treated as documentation — the hook still works correctly even when the matcher misfires (see [`rules/claude-code-hook-if-field-unreliable.md`](../rules/claude-code-hook-if-field-unreliable.md)).
+
+Handles all four `git commit` invocation forms:
+- bare: `git commit -m "..."`
+- `-C` path: `git -C /repo commit -m "..."`
+- env-prefix: `GIT_AUTHOR_NAME=x git commit -m "..."`
+- full-path: `/usr/bin/git commit -m "..."`
+
+Handles HEREDOC-style messages (this repo's standard form):
+```bash
+git commit -m "$(cat <<'EOF'
+feat(hooks): add validate-commit
+...
+EOF
+)"
+```
+
+If the message is wrapped in an unrecognized command substitution (`$(some-other-script)`), the hook **allows** the commit rather than risk a false-positive block.
+
+Output:
+- Valid commit / non-commit command: `{}` (allow)
+- Invalid format: `{"decision":"block","code":"CONVENTIONAL_COMMITS_VIOLATION","reason":"..."}`
+- Subject too long: `{"decision":"block","code":"COMMIT_SUBJECT_TOO_LONG","reason":"..."}`
+
 ## Running the tests
 
 ```bash
 node hooks/test.js
 ```
 
-Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file).
+Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file), validate-commit (valid + invalid + HEREDOC + env-prefix + -C path + full-path + malformed stdin), git-cmd unit tests.
 
 ## Tuning
 
