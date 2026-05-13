@@ -33,10 +33,17 @@ On each run:
 6. Write the new user settings AND update the sidecar to match CURRENT.
 
 First-run migration: when no sidecar exists (existing installs upgrading to
-this logic), we do a one-time path-based cleanup BEFORE the merge — any hook
-whose command references `$HOME/.claude/hooks/` or `~/.claude/hooks/` is
-assumed to be a stale config-owned hook and removed. This prevents the
-upgrade from leaving duplicates for users who had the old buggy installer.
+this logic), we do a one-time cleanup BEFORE the merge using two heuristics:
+
+  1. Path heuristic — any hook whose command references `$HOME/.claude/hooks/`
+     or `~/.claude/hooks/` is treated as stale config-owned.
+  2. Signature heuristic — any hook whose (event, matcher, if, type)
+     coordinates match a current shared hook is treated as a stale copy of
+     that hook (catches inline-script duplicates the path heuristic misses:
+     mojibake, whitespace drift, etc.).
+
+This prevents the upgrade from leaving duplicates for users who had the old
+buggy installer.
 
 User-added hooks are preserved unless they exactly match a previously-managed
 hash, which would only happen if the user copy-pasted a managed hook into
@@ -103,6 +110,41 @@ def collect_shared_hashes(shared_hooks: dict) -> tuple[set[str], dict]:
     return hashes, by_hash
 
 
+def collect_shared_signatures(shared_hooks: dict) -> set:
+    """Return signatures of shared hooks that carry an `if` field.
+
+    Used by the first-run migration to catch inline hooks (no path) that drift
+    from shared due to encoding mangling, whitespace changes, or refactors —
+    cases the path-based heuristic can't see. A hook with the same coordinates
+    AND trigger AND type as a current shared hook is almost certainly a stale
+    copy of that hook, not a user-written one with the same trigger.
+
+    Restricted to hooks with an `if` field on purpose. Without `if`, the
+    coordinates (event, matcher, type) match too many legitimate user hooks
+    that have nothing to do with the shared one — e.g., a user-added
+    `PostToolUse Bash command` hook would collide with the shared cleanup
+    hook by signature alone. The `if` trigger is the natural disambiguator.
+    """
+
+    signatures: set = set()
+    for event, entries in shared_hooks.items():
+        for entry in entries:
+            matcher = entry.get("matcher") or None
+            for hook in entry.get("hooks", []):
+                if_field = hook.get("if")
+                if not if_field:
+                    continue
+                signatures.add(
+                    (
+                        event,
+                        matcher,
+                        if_field,
+                        hook.get("type"),
+                    )
+                )
+    return signatures
+
+
 def drop_stale_managed_hooks(
     user_hooks: dict, previous_hashes: set[str], current_hashes: set[str]
 ) -> int:
@@ -134,11 +176,27 @@ def drop_stale_managed_hooks(
     return dropped
 
 
-def first_run_path_cleanup(user_hooks: dict) -> int:
+def first_run_cleanup(user_hooks: dict, shared_signatures: set) -> int:
     """One-time cleanup when sidecar doesn't exist.
 
-    Removes any hook whose command references the config hooks directory.
-    Returns count dropped.
+    Two heuristics, run together:
+
+    1. Path heuristic — drop any hook whose command references the config
+       hooks directory ($HOME/.claude/hooks/ or ~/.claude/hooks/). Catches
+       stale path-owned duplicates (renames, args changes) left by the old
+       installer.
+
+    2. Signature heuristic — drop any hook whose (event, matcher, if, type)
+       coordinates match a hook in the current shared config, but only when
+       the hook carries an `if` field. Catches inline-script duplicates
+       (mojibake, whitespace, refactor drift) that the path heuristic can't
+       see. The `if` field is the natural disambiguator: a user-written hook
+       with the exact same trigger AND type as a current shared hook is
+       extremely unlikely; the safer bet is it's a stale copy. Without `if`,
+       this check would over-match legitimate user hooks that happen to
+       share event+matcher+type with shared, so we skip them.
+
+    Returns count of hooks dropped.
     """
 
     dropped = 0
@@ -146,8 +204,17 @@ def first_run_path_cleanup(user_hooks: dict) -> int:
         entries = user_hooks[event]
         new_entries = []
         for entry in entries:
-            kept_hooks = [h for h in entry.get("hooks", []) if not is_path_owned_by_config(h)]
-            dropped += len(entry.get("hooks", [])) - len(kept_hooks)
+            matcher = entry.get("matcher") or None
+            kept_hooks = []
+            for hook in entry.get("hooks", []):
+                if is_path_owned_by_config(hook):
+                    dropped += 1
+                    continue
+                signature = (event, matcher, hook.get("if"), hook.get("type"))
+                if signature in shared_signatures:
+                    dropped += 1
+                    continue
+                kept_hooks.append(hook)
             if kept_hooks:
                 entry["hooks"] = kept_hooks
                 new_entries.append(entry)
@@ -156,6 +223,8 @@ def first_run_path_cleanup(user_hooks: dict) -> int:
         else:
             del user_hooks[event]
     return dropped
+
+
 
 
 def add_current_shared_hooks(user_hooks: dict, shared_hooks: dict) -> int:
@@ -216,7 +285,8 @@ def merge_settings(shared_path: str, user_path: str, sidecar_path: str) -> dict:
 
     migrated = 0
     if not sidecar_existed:
-        migrated = first_run_path_cleanup(user_hooks)
+        shared_signatures = collect_shared_signatures(shared_hooks)
+        migrated = first_run_cleanup(user_hooks, shared_signatures)
 
     dropped = drop_stale_managed_hooks(user_hooks, previous_hashes, current_hashes)
     added = add_current_shared_hooks(user_hooks, shared_hooks)
