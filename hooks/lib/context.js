@@ -72,6 +72,15 @@ function readFreshMetrics(sessionId, maxAgeSeconds) {
 }
 
 function resolveContextWindow(modelId) {
+  // Highest precedence: explicit user override. The PostToolUse hook payload
+  // doesn't include model info, and even when it does (statusline), the model
+  // id is the bare `claude-opus-4-7` regardless of whether the user is on the
+  // 200K default or the 1M variant — the 1M tier is enabled via a beta
+  // header, not the model id. So users on 1M MUST set this env var or the
+  // hook will measure them against the 200K default and fire false CRITICAL.
+  const envVal = parseInt(process.env.CLAUDE_CONTEXT_WINDOW, 10);
+  if (Number.isFinite(envVal) && envVal > 0) return envVal;
+
   if (!modelId) return DEFAULT_WINDOW;
   const key = String(modelId).toLowerCase();
   return CONTEXT_WINDOWS[modelId] || CONTEXT_WINDOWS[key] || DEFAULT_WINDOW;

@@ -49,11 +49,12 @@ function clearSidecar(sessionId) {
   }
 }
 
-function runHook(script, payload) {
+function runHook(script, payload, env) {
   const result = spawnSync('node', [script], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
     timeout: 10000,
+    env: { ...process.env, ...(env || {}) },
   });
   return {
     stdout: result.stdout || '',
@@ -238,6 +239,60 @@ console.log('Context monitor + statusline smoke tests\n');
     expect(out.stdout.length > 0, `expected fallback line, got empty`);
     expect(!/ctx \d+%/.test(out.stdout), `expected no ctx % without transcript, got: ${out.stdout.slice(0, 200)}`);
   });
+}
+
+// --- Env var override: CLAUDE_CONTEXT_WINDOW=1000000 silences warning at the
+// same byte count that would warn on a 200K window. This is the fix for users
+// on the 1M-context variant of Opus / Sonnet (model id alone doesn't say). ---
+{
+  const sid = uniqSession('8');
+  const t = genTranscript(500_000);
+  try {
+    const out = runHook(
+      MONITOR,
+      {
+        session_id: sid,
+        transcript_path: t,
+        cwd: HOOKS_DIR,
+        tool_name: 'Bash',
+        hook_event_name: 'PostToolUse',
+        model: { id: 'claude-opus-4-7' },
+      },
+      { CLAUDE_CONTEXT_WINDOW: '1000000' }
+    );
+    test('monitor: env var CLAUDE_CONTEXT_WINDOW=1000000 -> no warning at 500K bytes', () => {
+      expect(!out.stdout.trim(), `expected empty stdout with 1M env override, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    fs.unlinkSync(t);
+    clearSidecar(sid);
+  }
+}
+
+// --- Env var override: invalid value falls back to default 200K. ---
+{
+  const sid = uniqSession('9');
+  const t = genTranscript(500_000);
+  try {
+    const out = runHook(
+      MONITOR,
+      {
+        session_id: sid,
+        transcript_path: t,
+        cwd: HOOKS_DIR,
+        tool_name: 'Bash',
+        hook_event_name: 'PostToolUse',
+        model: { id: 'claude-opus-4-7' },
+      },
+      { CLAUDE_CONTEXT_WINDOW: 'not-a-number' }
+    );
+    test('monitor: invalid CLAUDE_CONTEXT_WINDOW falls back -> still warns at 500K bytes', () => {
+      expect(/WARNING|CRITICAL/.test(out.stdout), `expected warning when env override invalid, got: ${out.stdout.slice(0, 200)}`);
+    });
+  } finally {
+    fs.unlinkSync(t);
+    clearSidecar(sid);
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

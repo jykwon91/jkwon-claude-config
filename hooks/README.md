@@ -28,9 +28,35 @@ The hook is **silent at <35% used and on any failure**. It will never block a to
 
 1. Reads `transcript_path` from the hook stdin payload.
 2. Estimates tokens as `transcript_bytes / 3.5 + ~30K fixed overhead`.
-3. Looks up the model's context window (1M for `claude-opus-4-7[1m]`, 200K for everything else; full table in `lib/context.js`).
+3. Resolves the context window — env var first, then model-id lookup, then 200K default (see Configuration).
 4. Caches the result in `os.tmpdir()/claude-ctx-{session_id}.json` (sidecar reused by the statusline if you install it).
 5. Emits `hookSpecificOutput.additionalContext` with the warning when thresholds trip.
+
+### Configuration: telling the hook about a 1M-context model
+
+The PostToolUse hook payload doesn't include model info, and even where it does (statusline), Claude Code passes the bare model id (`claude-opus-4-7`) regardless of whether you're on the 200K default or the 1M variant — the 1M tier is enabled via a beta header, not the model id. So users on 1M MUST tell the hook explicitly via env var:
+
+```jsonc
+// ~/.claude/settings.json
+{
+  "env": {
+    "CLAUDE_CONTEXT_WINDOW": "1000000"
+  }
+}
+```
+
+Restart Claude Code after editing. Verify by running a Bash tool call and checking the sidecar:
+
+```bash
+cat "$(node -e 'console.log(require("os").tmpdir())')"/claude-ctx-*.json | python -m json.tool
+```
+
+Look for `"context_window": 1000000`. If you see `200000` instead, the env var isn't reaching the hook — confirm Claude Code reloaded the settings file.
+
+Resolution order:
+1. `CLAUDE_CONTEXT_WINDOW` env var (positive integer)
+2. Model-id lookup table in `lib/context.js`
+3. 200K default
 
 ## context-statusline (opt-in)
 
@@ -55,7 +81,7 @@ Output looks like: `ctx 23% (350K/1.0M) | MyFreeApps | Opus 4.7`. Indicators `!`
 node hooks/test.js
 ```
 
-Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists.
+Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, env-var override (valid + invalid).
 
 ## Tuning
 
