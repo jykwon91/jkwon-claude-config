@@ -341,5 +341,252 @@ console.log('Context monitor + statusline smoke tests\n');
   }
 }
 
+// =====================================================================
+// validate-commit hook tests
+// =====================================================================
+
+const VALIDATE_COMMIT = path.join(HOOKS_DIR, 'validate-commit.js');
+
+function runValidateCommit(command) {
+  return runHook(VALIDATE_COMMIT, {
+    tool_name: 'Bash',
+    hook_event_name: 'PreToolUse',
+    tool_input: { command },
+  });
+}
+
+// --- non-commit command: no-op ---
+{
+  const out = runValidateCommit('git status');
+  test('validate-commit: non-commit bash command -> empty (allow)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- git push: no-op ---
+{
+  const out = runValidateCommit('git push origin main');
+  test('validate-commit: git push -> empty (allow)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- valid feat commit ---
+{
+  const out = runValidateCommit('git commit -m "feat(hooks): add validate-commit"');
+  test('validate-commit: valid feat -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- valid rule commit (jkwon-specific type extension) ---
+{
+  const out = runValidateCommit('git commit -m "rule: add stacked-pr trap rule"');
+  test('validate-commit: rule: prefix -> allow (jkwon allowlist)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- valid infra commit ---
+{
+  const out = runValidateCommit('git commit -m "infra: provision MinIO shared stack"');
+  test('validate-commit: infra: prefix -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- valid breaking change (!) ---
+{
+  const out = runValidateCommit('git commit -m "feat(api)!: remove deprecated v1 endpoints"');
+  test('validate-commit: breaking-change marker (!) -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- single-quoted message ---
+{
+  const out = runValidateCommit("git commit -m 'fix(deploy): retry on 503'");
+  test('validate-commit: single-quoted -m -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- invalid: no type prefix ---
+{
+  const out = runValidateCommit('git commit -m "just a message without a prefix"');
+  test('validate-commit: missing type prefix -> block', () => {
+    expect(/decision":"block"/.test(out.stdout), `expected block, got: ${out.stdout.slice(0, 200)}`);
+    expect(/CONVENTIONAL_COMMITS_VIOLATION/.test(out.stdout), `expected violation code, got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- invalid: unknown type ---
+{
+  const out = runValidateCommit('git commit -m "wibble(scope): bad type"');
+  test('validate-commit: unknown type -> block', () => {
+    expect(/decision":"block"/.test(out.stdout), `expected block, got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- invalid: subject too long (>100 chars) ---
+{
+  const longSubj = 'feat(hooks): ' + 'x'.repeat(105);
+  const out = runValidateCommit(`git commit -m "${longSubj}"`);
+  test('validate-commit: subject >100 chars -> block', () => {
+    expect(/decision":"block"/.test(out.stdout), `expected block, got: ${out.stdout.slice(0, 200)}`);
+    expect(/COMMIT_SUBJECT_TOO_LONG/.test(out.stdout), `expected length code, got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- env-prefix invocation: GIT_AUTHOR_NAME=x git commit -m "..." ---
+{
+  const out = runValidateCommit('GIT_AUTHOR_NAME=test git commit -m "feat: env-prefix invocation"');
+  test('validate-commit: env-prefix git commit -> validated (allow on valid)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- env-prefix with invalid message blocks ---
+{
+  const out = runValidateCommit('GIT_AUTHOR_NAME=test git commit -m "no prefix here"');
+  test('validate-commit: env-prefix git commit with bad message -> block', () => {
+    expect(/decision":"block"/.test(out.stdout), `expected block, got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- -C path: git -C /repo commit -m "..." ---
+{
+  const out = runValidateCommit('git -C /tmp/repo commit -m "fix(x): -C path form"');
+  test('validate-commit: git -C path commit -> validated', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- full-path git ---
+{
+  const out = runValidateCommit('/usr/bin/git commit -m "chore: full-path git"');
+  test('validate-commit: /usr/bin/git commit -> validated', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- no -m flag (interactive editor): allow ---
+{
+  const out = runValidateCommit('git commit --amend');
+  test('validate-commit: git commit without -m (editor) -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- HEREDOC pattern (this repo's standard commit form) ---
+{
+  const heredocCmd =
+    "git commit -m \"$(cat <<'EOF'\nfeat(hooks): add validate-commit\n\nLonger body explaining the change.\n\nCo-Authored-By: Claude\nEOF\n)\"";
+  const out = runValidateCommit(heredocCmd);
+  test('validate-commit: HEREDOC pattern with valid subject -> allow', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- HEREDOC pattern with invalid subject ---
+{
+  const heredocCmd =
+    "git commit -m \"$(cat <<'EOF'\nbroken: not a real type\n\nBody.\nEOF\n)\"";
+  const out = runValidateCommit(heredocCmd);
+  test('validate-commit: HEREDOC pattern with invalid subject -> block', () => {
+    expect(/decision":"block"/.test(out.stdout), `expected block, got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- Unrecognized command substitution: allow (don't false-block) ---
+{
+  const out = runValidateCommit('git commit -m "$(some-other-script)"');
+  test('validate-commit: unknown command substitution -> allow (safe default)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- empty message: allow (git itself will reject) ---
+{
+  const out = runValidateCommit('git commit -m ""');
+  test('validate-commit: empty -m message -> allow (git handles)', () => {
+    expect(out.stdout === '{}', `expected '{}', got: ${out.stdout.slice(0, 200)}`);
+  });
+}
+
+// --- malformed JSON stdin: allow ---
+{
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), `claude-test-home-${process.pid}-`));
+  try {
+    const result = spawnSync('node', [VALIDATE_COMMIT], {
+      input: 'not json',
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome },
+    });
+    test('validate-commit: malformed stdin -> allow (silent-fail)', () => {
+      expect(result.stdout === '{}', `expected '{}', got: ${(result.stdout || '').slice(0, 200)}`);
+    });
+  } finally {
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
+}
+
+// =====================================================================
+// git-cmd.js unit tests
+// =====================================================================
+
+const { isGitSubcommand, tokenize } = require(path.join(HOOKS_DIR, 'lib', 'git-cmd.js'));
+
+test('git-cmd: bare git commit detected', () => {
+  expect(isGitSubcommand('git commit -m "x"', 'commit'), 'bare commit not detected');
+});
+
+test('git-cmd: git status is not commit', () => {
+  expect(!isGitSubcommand('git status', 'commit'), 'status falsely matched commit');
+});
+
+test('git-cmd: git -C /path commit detected', () => {
+  expect(isGitSubcommand('git -C /tmp/repo commit -m "x"', 'commit'), '-C commit not detected');
+});
+
+test('git-cmd: GIT_AUTHOR_NAME=x git commit detected', () => {
+  expect(
+    isGitSubcommand('GIT_AUTHOR_NAME=test git commit -m "x"', 'commit'),
+    'env-prefix commit not detected'
+  );
+});
+
+test('git-cmd: /usr/bin/git commit detected', () => {
+  expect(isGitSubcommand('/usr/bin/git commit -m "x"', 'commit'), 'full-path commit not detected');
+});
+
+test('git-cmd: --git-dir=path commit detected', () => {
+  expect(
+    isGitSubcommand('git --git-dir=.git commit -m "x"', 'commit'),
+    '--git-dir= commit not detected'
+  );
+});
+
+test('git-cmd: multiple env vars + global flag', () => {
+  expect(
+    isGitSubcommand('GIT_AUTHOR_NAME=a GIT_COMMITTER_EMAIL=b git -c color.ui=false commit', 'commit'),
+    'complex prefix not handled'
+  );
+});
+
+test('git-cmd: empty command returns false', () => {
+  expect(!isGitSubcommand('', 'commit'), 'empty matched');
+});
+
+test('git-cmd: not-git returns false', () => {
+  expect(!isGitSubcommand('npm commit', 'commit'), 'npm matched');
+});
+
+test('git-cmd: tokenize handles double-quoted strings', () => {
+  const t = tokenize('git commit -m "hello world"');
+  expect(t.length === 4 && t[3] === 'hello world', `bad tokenize: ${JSON.stringify(t)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
