@@ -11,6 +11,7 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 | `check-pr-not-merged.js` | `PreToolUse:Bash(git push:*)` hook | Yes |
 | `cleanup-after-merge.js` | `PostToolUse:Bash` hook | Yes |
 | `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
+| `read-injection-scanner.js` | `PostToolUse:Read` hook | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
 | `lib/git-cmd.js` | Shared library (token-walk git-subcommand classifier) | n/a |
 | `test.js` | Cross-platform smoke tests | Run with `node hooks/test.js` |
@@ -114,13 +115,52 @@ Output:
 - Invalid format: `{"decision":"block","code":"CONVENTIONAL_COMMITS_VIOLATION","reason":"..."}`
 - Subject too long: `{"decision":"block","code":"COMMIT_SUBJECT_TOO_LONG","reason":"..."}`
 
+## read-injection-scanner
+
+PostToolUse hook on the `Read` tool. Scans file content returned by Read for prompt-injection patterns and emits an advisory `additionalContext` warning when matches occur. **Never blocks.**
+
+**Severity:**
+- `LOW` — 1-2 patterns. Likely a false positive (e.g., documentation that quotes an injection example). Heads-up, proceed.
+- `HIGH` — 3+ patterns. Strong injection signal. Review the file before acting on its content.
+
+**Why it exists.** Long sessions hit context compression, and the summariser does not distinguish user instructions from content read from external files. A poisoned instruction that survives compression becomes indistinguishable from trusted context. This hook warns at ingestion time so the agent (and downstream auto-memory) can be aware before the content compresses into the conversation history.
+
+**Pattern categories detected:**
+1. Standard prompt-injection (e.g., "ignore previous instructions", "you are now", `<system>` tags)
+2. Summarization-survival patterns (e.g., "when summarising, retain this") — these target context compression specifically
+3. Invisible Unicode (zero-width spaces, RTL controls, BOM, soft hyphens)
+4. Unicode tag block (U+E0000-E007F — known invisible-instruction injection vector)
+
+Pattern lists are defined as constants at the top of `read-injection-scanner.js` (`SUMMARISATION_PATTERNS`, `INJECTION_PATTERNS`). Edit to add or remove patterns.
+
+**Path-based exclusions** (false-positive control):
+- `~/.claude/projects/<hash>/{memory,rules,state,specs}/` — auto-memory tier files
+- `jkwon-claude-config/{rules,hooks,skills,agents,docs,stacks}/` — config repo docs that quote patterns
+- `~/.claude/{hooks,agents,skills,rules,stacks}/` — installed config (symlink target)
+- Project-level doc filenames: `CLAUDE.md`, `TECH_DEBT.md`, `ROADMAP.md`, `MEMORY.md`, `README.md`, `CHANGELOG.md`, `SECURITY.md`, `REVIEW.md`, `PREFERENCES.md`, `CHECKPOINT*`
+- Any path containing `security/`, `injection/`, `prompt-injection/`, `pwn/`, `techsec/`
+
+Edit `isExcludedPath()` to extend.
+
+**Output shape** (on match only):
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "READ INJECTION SCAN [HIGH]: file \"poisoned.txt\" matched 4 pattern(s): ..."
+  }
+}
+```
+
+Failure modes (malformed JSON stdin, missing tool_response, etc.) all silent-fail with no output.
+
 ## Running the tests
 
 ```bash
 node hooks/test.js
 ```
 
-Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file), validate-commit (valid + invalid + HEREDOC + env-prefix + -C path + full-path + malformed stdin), git-cmd unit tests.
+Covers: low/high/critical usage, 1M window, debounce, path-traversal rejection in session IDs, statusline output, graceful degradation when no transcript exists, settings.json override (valid + invalid + missing file), validate-commit (valid + invalid + HEREDOC + env-prefix + -C path + full-path + malformed stdin), git-cmd unit tests, read-injection-scanner (clean + LOW + HIGH + invisible Unicode + path exclusions + structured tool_response + malformed stdin).
 
 ## Tuning
 
