@@ -48,6 +48,16 @@
         ]
       },
       {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/read-injection-scanner.js",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",
