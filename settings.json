@@ -61,11 +61,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $HOME/.claude/hooks/context-monitor.js",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node $HOME/.claude/hooks/state-update-reminder.js",
             "timeout": 5000
           }
