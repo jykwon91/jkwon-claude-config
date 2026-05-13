@@ -28,9 +28,9 @@ fi
 echo "Installing Claude shared config to $DEST..."
 echo ""
 
-# Symlink directories: agents, rules, stacks
+# Symlink directories: agents, rules, stacks, hooks
 # These are fully managed by the config repo — symlink the entire directory
-for dir in agents rules stacks; do
+for dir in agents rules stacks hooks; do
   src="$SCRIPT_DIR/$dir"
   dest="$DEST/$dir"
 

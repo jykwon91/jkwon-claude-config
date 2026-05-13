@@ -40,6 +40,15 @@
             "statusMessage": "Cleaning up merged branch..."
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/context-monitor.js",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
