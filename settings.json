@@ -13,7 +13,7 @@
           {
             "type": "command",
             "if": "Bash(git push:*)",
-            "command": "py -c \"import sys,json,subprocess;data=json.load(sys.stdin);branch=subprocess.run(['git','rev-parse','--abbrev-ref','HEAD'],capture_output=True,text=True).stdout.strip();state=subprocess.run(['gh','pr','view',branch,'--json','state','--jq','.state'],capture_output=True,text=True).stdout.strip() if branch and branch not in('main','master') else '';print(json.dumps({'decision':'block','reason':f'PR for branch {branch} is already MERGED. Create a new branch and cherry-pick your commits.'})) if state=='MERGED' else print('{}')\"",
+            "command": "node $HOME/.claude/hooks/check-pr-not-merged.js",
             "timeout": 10,
             "statusMessage": "Checking if PR is already merged..."
           },
