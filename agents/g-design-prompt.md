@@ -28,6 +28,15 @@ Before recommending custom prompt infrastructure (prompt templating, output pars
 - Is there a fallback value for every field when extraction fails (e.g., null vs omit vs "unknown")?
 - Does the prompt enforce that the model returns ONLY the structured output, not conversational filler?
 
+### Input-modality sufficiency
+
+The most fundamental extraction failure is requesting a field the input *cannot* support — not "hard to extract" but **definitionally unextractable**. A vision model sent a first-person POV game frame cannot infer top-down minimap coordinates; a text-only prompt cannot return a logo's color; a single-page excerpt cannot total a multi-page ledger.
+
+- For EVERY field in the output schema, ask: does the provided input actually contain information that **causally supports** this field — not merely correlates with it?
+- If the input modality cannot support a field, the model will hallucinate a plausible-looking value rather than return null. That is worse than omitting the field: it silences the null that should have signaled "this value must come from another source."
+- Flag any such field as **Must Address**: remove it from the extraction schema and defer it to a path that can actually produce it — a different input that carries the signal, a deterministic computation, or a human/operator data-entry step.
+- This is distinct from confidence signaling: a low-confidence guess still implies the answer is *in* the input. Modality-insufficiency means it is *not in the input at all*, so per-field confidence will not catch it.
+
 ### Extraction completeness
 - Does the prompt cover all document types the system handles? (invoices, PM statements, receipts, leases, tax forms, 1099s, year-end summaries)
 - Are multi-item documents handled? (one PDF containing multiple invoices, a statement with 12 reservations)
