@@ -11,6 +11,7 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 | `check-pr-not-merged.js` | `PreToolUse:Bash(git push:*)` hook | Yes |
 | `cleanup-after-merge.js` | `PostToolUse:Bash` hook | Yes |
 | `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
+| `block-commit-to-main.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `read-injection-scanner.js` | `PostToolUse:Read` hook | Yes |
 | `state-update-reminder.js` | `PostToolUse` hook (self-gates on Edit/Write/MultiEdit/NotebookEdit) | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
@@ -115,6 +116,22 @@ Output:
 - Valid commit / non-commit command: `{}` (allow)
 - Invalid format: `{"decision":"block","code":"CONVENTIONAL_COMMITS_VIOLATION","reason":"..."}`
 - Subject too long: `{"decision":"block","code":"COMMIT_SUBJECT_TOO_LONG","reason":"..."}`
+
+## block-commit-to-main
+
+PreToolUse hook on `Bash(git commit*)`. Blocks `git commit` when the current branch is `main` or `master` to prevent accidental direct commits to the default branch.
+
+Replaces the previous inline-bash hook in `settings.json` that relied solely on the `if: "Bash(git commit*)"` matcher to gate execution. Per [`rules/claude-code-hook-if-field-unreliable.md`](../rules/claude-code-hook-if-field-unreliable.md), the `if` field misfires under the Bash matcher and the inline-bash version was effectively blocking ALL Bash tool calls (including `git log`, `gh pr view`, `ls`) whenever the persistent CWD happened to be on main.
+
+Self-gates inside the hook body via `lib/git-cmd.js` so the same `if` field is now treated as documentation only.
+
+Branch detection uses `git symbolic-ref --short HEAD` (not `git rev-parse --abbrev-ref HEAD`) so the hook also blocks correctly on an empty repo, where `rev-parse` returns the literal string `HEAD` instead of the configured initial branch name.
+
+Caveat: the hook subprocess inherits Claude Code's persistent CWD, not any `cd <dir> &&` target chained into the same Bash call (see [`rules/claude-code-hook-runs-in-persistent-cwd.md`](../rules/claude-code-hook-runs-in-persistent-cwd.md)). If you intend to commit in a worktree from a session whose persistent CWD is the main repo on main, split the `cd` into its own Bash call so the persistent CWD updates before the commit fires.
+
+Output:
+- Non-commit command / commit on feature branch / detached HEAD / no git repo: `{}` (allow)
+- Commit on `main` or `master`: `{"decision":"block","reason":"Cannot commit directly to <branch>. Create a feature branch first."}`
 
 ## read-injection-scanner
 
