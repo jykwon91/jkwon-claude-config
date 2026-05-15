@@ -7,8 +7,9 @@
           {
             "type": "command",
             "if": "Bash(git commit*)",
-            "command": "bash -c 'BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"Cannot commit directly to main. Create a feature branch first.\\\"}\"; fi'",
-            "timeout": 5000
+            "command": "node $HOME/.claude/hooks/block-commit-to-main.js",
+            "timeout": 5000,
+            "statusMessage": "Checking branch before commit..."
           },
           {
             "type": "command",
