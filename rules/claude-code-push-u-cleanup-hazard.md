@@ -52,6 +52,17 @@ So with upstream set, `branch -d` only requires "matches upstream" — not "merg
    ```
    Local commits survive even after `branch -d` because reflog keeps them for 30+ days. Recreate the branch ref from the reflog entry.
 
+4. **Enable auto-merge via the GitHub GraphQL API, not `gh pr merge --auto`:**
+   ```bash
+   PR_ID=$(gh pr view <num> --json id --jq .id)
+   gh api graphql -f query='mutation($pr:ID!){enablePullRequestAutoMerge(input:{pullRequestId:$pr,mergeMethod:SQUASH}){pullRequest{autoMergeRequest{enabledAt}}}}' -f pr="$PR_ID"
+   ```
+   `gh pr merge --auto --squash --delete-branch` matches the cleanup hook's `Bash(gh pr merge*)` matcher and triggers the destructive `git branch -d` + `git push origin --delete` chain **even when no merge has actually happened** — auto-merge only queues at this point, GitHub merges later. The cleanup runs immediately on the matcher hit and destroys the branch before CI completes. Switching to the GraphQL mutation sidesteps the matcher entirely; auto-merge gets enabled identically on GitHub's side, and the cleanup hook never fires.
+
+   Real incident: 2026-05-14, MyFreeApps PR #628 destroyed in flight by exactly this. Recovered via reflog (workaround 3) as PR #629.
+
+   `enablePullRequestAutoMerge` requires the repo to have auto-merge enabled (one-time setup): `gh api -X PATCH repos/<owner>/<repo> -f allow_auto_merge=true`.
+
 ## What this means for hook authors
 
 A cleanup hook that does `git push origin --delete` after `git branch -d` is **only safe if `branch -d` reflects "merged to main", not "merged to upstream"**. The simplest fix: chain the steps with `&&` AND explicitly checkout main FIRST so `branch -d`'s HEAD check is against main, not upstream:
