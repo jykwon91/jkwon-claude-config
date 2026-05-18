@@ -6,6 +6,13 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(*)",
+            "command": "node $HOME/.claude/hooks/block-drop-database.js",
+            "timeout": 5000,
+            "statusMessage": "Guarding against irreversible DROP DATABASE / dropdb..."
+          },
+          {
+            "type": "command",
             "if": "Bash(git commit*)",
             "command": "node $HOME/.claude/hooks/block-commit-to-main.js",
             "timeout": 5000,
