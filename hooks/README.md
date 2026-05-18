@@ -12,6 +12,7 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 | `cleanup-after-merge.js` | `PostToolUse:Bash` hook | Yes |
 | `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `block-commit-to-main.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
+| `block-drop-database.js` | `PreToolUse:Bash` hook (self-gates on `DROP DATABASE`/`dropdb`) | Yes |
 | `read-injection-scanner.js` | `PostToolUse:Read` hook | Yes |
 | `state-update-reminder.js` | `PostToolUse` hook (self-gates on Edit/Write/MultiEdit/NotebookEdit) | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
