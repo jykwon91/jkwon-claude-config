@@ -51,6 +51,31 @@ Apply these patterns when the project uses Python. Detect Python from `requireme
 - Separate I/O from computation — functions that compute should not also read files or query databases.
 - Use dependency injection to make functions testable without mocking.
 
+## HIGH — Testing: Repository Mock Blind Spot
+
+Mocking a repository function at the service-test boundary means the real SQLAlchemy query is never exercised — the test passes even if the query is structurally broken. This is a hidden blind spot, not a tradeoff.
+
+The concrete failure mode: a service test mocks `repo.list_by_channel(...)` at the call boundary. The real implementation uses `Channel.slug` as the filter field, but the model's primary key column is named `Channel.id`. The bug (`AttributeError: type object 'Channel' has no attribute 'slug'`) is invisible to the service test because the mock returns a canned list regardless of what `list_by_channel` actually does. The bug surfaces only in production or an integration test (MyFreeApps PR #788).
+
+**The rule:** for every repository function that is mocked in service tests, there MUST be a companion repository-level test that runs the real query against a seeded test database and asserts correct results. Service-test mocks are a scope boundary, not a substitute for exercising the query.
+
+```python
+# service_test.py — mock is fine for testing service logic
+async def test_list_by_channel_service(mock_repo):
+    mock_repo.list_by_channel.return_value = [fake_listing()]
+    result = await service.get_channel_listings(channel_id="airbnb")
+    assert len(result) == 1
+
+# repository_test.py — REQUIRED companion that exercises the real query
+async def test_list_by_channel_query(db_session, seeded_listings):
+    # Confirms the actual SQLAlchemy filter column name is correct
+    result = await repo.list_by_channel(db_session, channel_id="airbnb")
+    assert len(result) == 1
+    assert result[0].channel_id == "airbnb"
+```
+
+When adding a new repository method, the PR MUST include a repository-level test. Service-only coverage is a test-coverage gap.
+
 ## LOW — Performance
 
 - Use generators for large data processing instead of building full lists in memory.
