@@ -103,6 +103,48 @@ See `rules/monorepo-parity-discipline.md` for the full discipline. The React-spe
 - Add a post-deploy smoke check that fetches the live `index.html`, extracts the asset hash via `grep -oE 'src="/[^"]*index-[A-Za-z0-9_-]+\.js"'`, and asserts that exact file is reachable from the serving layer. If the live HTML and the build-output hash diverge, fail the deploy loudly instead of silently shipping a stale bundle.
 - Don't ship a follow-up "fix" until you've verified the previous fix actually reached production. Cascading wrong fixes (each shipped after the previous one didn't work) is exactly how you accumulate three architecturally-broken layers in one outage.
 
+## HIGH — Safe Markdown Rendering (operator/user-authored content)
+
+When rendering markdown authored by operators or users on any page (especially unauthenticated/public pages), use `react-markdown` with the following constraints — no exceptions:
+
+- **No `rehype-raw`** — omit it entirely. Without `rehype-raw`, raw HTML tags in the markdown source are rendered as escaped text, not executable HTML. Adding it reintroduces XSS vectors that `react-markdown` otherwise closes off.
+- **No images by default** — disable the `img` component unless images from known-safe CDNs are an explicit product requirement. User-supplied image URLs can be used for pixel-tracking, SSRF probing, and leak of referer headers.
+- **Allowlist link protocols, never blocklist** — the correct URL scheme gate is `href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:")`, failing closed on parse error. Do NOT use a blocklist (`!startsWith("javascript:") && !startsWith("data:")`): blocklists miss `vbscript:`, `file:`, `blob:`, and future schemes; CodeQL flags this pattern as `js/incomplete-url-sanitization` (high severity).
+- **Always add `rel="noopener noreferrer"` and `target="_blank"`** on rendered links to prevent reverse tabnapping.
+- **Fail closed on URL parse errors** — wrap the URL test in a `try/catch`; if `new URL(href)` throws, suppress the link entirely.
+
+```tsx
+import ReactMarkdown from "react-markdown";
+
+const ALLOWED_PROTOCOLS = ["http:", "https:", "mailto:"];
+
+function isSafeHref(href: string): boolean {
+  try {
+    return ALLOWED_PROTOCOLS.includes(new URL(href).protocol);
+  } catch {
+    return false;
+  }
+}
+
+<ReactMarkdown
+  components={{
+    a: ({ href, children }) =>
+      href && isSafeHref(href) ? (
+        <a href={href} rel="noopener noreferrer" target="_blank">
+          {children}
+        </a>
+      ) : (
+        <span>{children}</span>
+      ),
+    img: () => null,
+  }}
+>
+  {markdownContent}
+</ReactMarkdown>
+```
+
+This pattern passed CodeQL `js/incomplete-url-sanitization` in CI (PR #792, MyFreeApps). The blocklist variant did not.
+
 ## HIGH — Next.js Specific (skip if the project uses Vite/CRA/other SPA bundler)
 
 - Authenticate Server Actions the same as API routes — verify auth inside each action, never rely on middleware alone.
