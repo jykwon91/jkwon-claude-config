@@ -226,8 +226,10 @@ Run the complete validation pipeline. This is a gated, staged process — do not
 Detect the project's test runners, linters, and build tools from config files (`package.json`, `pyproject.toml`, `Makefile`, etc.) — never hardcode commands.
 
 **Stage 1 — Build check:**
-- Run the project's type checker and linter (errors only, ignore warnings)
-- Fix any errors, loop until clean (max 5 iterations per error)
+- Run the project's **actual production build** (detect the command from config — e.g. `npm run build`, which for Vite/TS projects typically runs `tsc -b && vite build`; the stack-appropriate equivalent otherwise — `go build ./...`, `cargo build`, `mvn compile`, etc.). Run the linter too (errors only, ignore warnings).
+- **A passing unit-test run does NOT constitute a build or type-check pass.** Vitest/jest run code through esbuild (or an equivalent lenient transpiler) that does NOT type-check and tolerates syntax errors that `tsc -b` rejects. A green Vitest/jest run says nothing about whether the production build compiles. Never report a feature "green" off the unit-test runner alone.
+- Run a **static security check equivalent to CI's** where one exists — at minimum the project's typecheck + lint, plus any configured CodeQL/semgrep step. If the project has a CI static-analysis step, run its local equivalent.
+- Treat a non-zero exit from the production build, type checker, or static security check as a **hard failure**. Fix the code, loop until clean (max 5 iterations per error). Do not advance to Stage 2 until the production build and type check exit zero.
 
 **Stage 2 — Unit tests:**
 - Run frontend and backend unit test suites
