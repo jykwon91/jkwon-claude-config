@@ -55,13 +55,15 @@ Execute each stage in order. Do not skip stages. Do not advance if a stage has u
 
 ### Stage 1: Build Check
 
-Run the project's type checker and linter (errors only, ignore warnings).
+Run the project's **actual production build** (detect the command from config — e.g. `npm run build`, which for Vite/TS projects typically runs `tsc -b && vite build`; the stack-appropriate equivalent otherwise — `go build ./...`, `cargo build`, `mvn compile`, etc.). Run the type checker and linter too (errors only, ignore warnings). Where the project has a CI static-analysis step (CodeQL, semgrep), run its local equivalent.
 
-If either fails:
+**A passing unit-test run (Stage 2) does NOT constitute a build or type-check pass.** Vitest/jest run code through esbuild (or an equivalent lenient transpiler) that does NOT type-check and tolerates syntax errors that `tsc -b` rejects. A green unit-test run says nothing about whether the production build compiles — never treat Stage 2 as a substitute for this stage.
+
+If the production build, type check, linter, or static security check fails:
 - Read the error, identify the file and line, fix the error, re-run
 - Loop until clean (max 5 iterations per error)
 
-Only advance to Stage 2 when both pass.
+Treat any non-zero build/typecheck/static-check exit as a hard failure. Only advance to Stage 2 when the production build and all checks pass.
 
 ---
 
