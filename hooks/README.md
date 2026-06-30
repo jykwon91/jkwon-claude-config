@@ -13,6 +13,7 @@ Node-based hooks that ship with this config repo. Auto-installed via `install.sh
 | `validate-commit.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `block-commit-to-main.js` | `PreToolUse:Bash(git commit*)` hook | Yes |
 | `block-drop-database.js` | `PreToolUse:Bash` hook (self-gates on `DROP DATABASE`/`dropdb`) | Yes |
+| `pr-quality-gate.js` | `PreToolUse:Bash` hook (self-gates on `gh pr create`; runs a headless Haiku review) | Yes |
 | `read-injection-scanner.js` | `PostToolUse:Read` hook | Yes |
 | `state-update-reminder.js` | `PostToolUse` hook (self-gates on Edit/Write/MultiEdit/NotebookEdit) | Yes |
 | `lib/context.js` | Shared library (transcript -> tokens estimate, sidecar I/O) | n/a |
@@ -133,6 +134,24 @@ Caveat: the hook subprocess inherits Claude Code's persistent CWD, not any `cd <
 Output:
 - Non-commit command / commit on feature branch / detached HEAD / no git repo: `{}` (allow)
 - Commit on `main` or `master`: `{"decision":"block","reason":"Cannot commit directly to <branch>. Create a feature branch first."}`
+
+## pr-quality-gate
+
+PreToolUse hook on `Bash(gh pr create*)`. Before a PR is opened, reviews the current branch against `main` and **blocks** `gh pr create` if quality standards are not met (missing/meaningless E2E tests, ORM in services/routes, multiple components per `.tsx` file, `: any` typing, magic-string state values, nested JSX ternaries). Allows the command (`{}`) otherwise.
+
+**Why it's a `command` hook, not an `agent` hook.** This logic used to be a `type: "agent"` hook in `settings.json` gated only by `if: "Bash(gh pr create*)"`. Per [`rules/claude-code-hook-if-field-unreliable.md`](../rules/claude-code-hook-if-field-unreliable.md) the `if` field does not reliably filter a Bash-matcher hook, and an `agent` hook has no body in which to self-gate — so it fired a ~120s Haiku review on **every** Bash tool call and could block any git command in auto mode. It is now a `type: "command"` hook that reads the triggering command from stdin and self-gates: the review only runs when the command is actually `gh pr create` (matched at the start of the command or after an `&&` chain).
+
+**How the review runs.** The hook shells out to a headless `claude -p` with the original Haiku prompt and passes the `{decision:"block"}` / `{}` result straight through. `--safe-mode` keeps auth and built-in tools but disables hooks, so the nested review never re-triggers this (or any) hook.
+
+**Editing the checks.** The review criteria live in `pr-quality-gate.prompt.md` (plain markdown — no escaping). Edit that file to change what the gate enforces; the wrapper is content-agnostic.
+
+**Fail-open.** Any error — bad stdin, missing prompt, `claude` spawn failure, non-zero exit, timeout, unparseable output — emits `{}` (allow). The gate only ever blocks when the nested review explicitly returns a block, so a bug in the wrapper can never recreate the original "blocks every Bash call" failure; the worst case is the gate silently no-ops.
+
+Standalone smoke tests: `node hooks/test-pr-quality-gate.js` — covers the self-gate on non-matching commands, fail-open on malformed/empty stdin, and the command-matcher + decision-parser unit tests. The live `claude` review path is verified manually (it makes a billed model call).
+
+Output:
+- Non-`gh pr create` command / passing review / any failure: `{}` (allow)
+- Failing review: `{"decision":"block","reason":"<specific failure>"}`
 
 ## read-injection-scanner
 
