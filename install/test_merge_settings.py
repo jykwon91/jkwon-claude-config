@@ -30,7 +30,9 @@ def _load_merge_module():
 merge_settings = _load_merge_module()
 
 
-class MergeSettingsCase(unittest.TestCase):
+class MergeCaseBase(unittest.TestCase):
+    """Shared temp-file fixtures; holds no tests of its own."""
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="merge-settings-test-")
         self.shared_path = os.path.join(self.tmp, "shared.json")
@@ -60,6 +62,8 @@ class MergeSettingsCase(unittest.TestCase):
             self.shared_path, self.user_path, self.sidecar_path
         )
 
+
+class MergeSettingsCase(MergeCaseBase):
     # --- Baseline: first run with no user settings ----------------------------
 
     def test_first_run_no_user_settings(self):
@@ -609,6 +613,117 @@ class MergeSettingsCase(unittest.TestCase):
         user = self.read_user()
         # PostToolUse should be pruned since its last hook was dropped
         self.assertNotIn("PostToolUse", user.get("hooks", {}))
+
+
+class ManagedDefaultsCase(MergeCaseBase):
+    """Top-level managed defaults (every shared key except "hooks")."""
+
+    SHARED = {
+        "model": "opus",
+        "effortLevel": "high",
+        "hooks": {},
+    }
+
+    def test_defaults_set_when_absent(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        stats = self.run_merge()
+        user = self.read_user()
+        self.assertEqual(user["model"], "opus")
+        self.assertEqual(user["effortLevel"], "high")
+        self.assertEqual(stats["defaults_set"], 2)
+        self.assertEqual(
+            self.read_sidecar()["managed_defaults"],
+            {"model": "opus", "effortLevel": "high"},
+        )
+
+    def test_user_deviation_preserved(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"model": "fable", "hooks": {}})
+        stats = self.run_merge()
+        user = self.read_user()
+        self.assertEqual(user["model"], "fable")  # user-owned, untouched
+        self.assertEqual(user["effortLevel"], "high")  # absent -> set
+        self.assertEqual(stats["defaults_set"], 1)
+        # deviated key is not tracked
+        self.assertNotIn("model", self.read_sidecar()["managed_defaults"])
+
+    def test_repo_change_propagates_while_unchanged_by_user(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        # Repo bumps the default; user never touched the key
+        changed = dict(self.SHARED, effortLevel="medium")
+        self.write(self.shared_path, changed)
+        stats = self.run_merge()
+        self.assertEqual(self.read_user()["effortLevel"], "medium")
+        self.assertEqual(stats["defaults_updated"], 1)
+
+    def test_repo_change_does_not_stomp_user_deviation(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        # User deviates after the default was applied
+        user = self.read_user()
+        user["model"] = "sonnet"
+        self.write(self.user_path, user)
+        # Repo changes the default
+        changed = dict(self.SHARED, model="haiku")
+        self.write(self.shared_path, changed)
+        self.run_merge()
+        self.assertEqual(self.read_user()["model"], "sonnet")
+        self.assertNotIn("model", self.read_sidecar()["managed_defaults"])
+
+    def test_matching_user_value_is_adopted_and_follows_repo(self):
+        # User already has the same value the repo ships -> adopt as managed,
+        # so a later repo-side change propagates.
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"model": "opus", "hooks": {}})
+        self.run_merge()
+        self.assertEqual(self.read_sidecar()["managed_defaults"]["model"], "opus")
+        changed = dict(self.SHARED, model="sonnet")
+        self.write(self.shared_path, changed)
+        stats = self.run_merge()
+        self.assertEqual(self.read_user()["model"], "sonnet")
+        self.assertEqual(stats["defaults_updated"], 1)
+
+    def test_dropped_default_keeps_user_value(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        # Repo stops shipping the default entirely
+        self.write(self.shared_path, {"hooks": {}})
+        self.run_merge()
+        user = self.read_user()
+        self.assertEqual(user["model"], "opus")  # additive: never unset
+        self.assertEqual(self.read_sidecar()["managed_defaults"], {})
+
+    def test_defaults_idempotent(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        first = self.read_user()
+        stats = self.run_merge()
+        self.assertEqual(self.read_user(), first)
+        self.assertEqual(stats["defaults_set"], 0)
+        self.assertEqual(stats["defaults_updated"], 0)
+
+    def test_deleted_key_reapplies_default(self):
+        self.write(self.shared_path, self.SHARED)
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        user = self.read_user()
+        del user["model"]
+        self.write(self.user_path, user)
+        stats = self.run_merge()
+        self.assertEqual(self.read_user()["model"], "opus")
+        self.assertEqual(stats["defaults_set"], 1)
+
+    def test_hooks_key_never_treated_as_default(self):
+        self.write(self.shared_path, {"hooks": {}})
+        self.write(self.user_path, {"hooks": {}})
+        self.run_merge()
+        self.assertNotIn("hooks", self.read_sidecar()["managed_defaults"])
 
 
 if __name__ == "__main__":

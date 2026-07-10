@@ -48,6 +48,25 @@ buggy installer.
 User-added hooks are preserved unless they exactly match a previously-managed
 hash, which would only happen if the user copy-pasted a managed hook into
 their own settings (in which case treating it as managed is reasonable).
+
+Managed defaults (top-level keys)
+---------------------------------
+
+Every top-level key in the shared settings.json other than "hooks" is a
+*managed default* (e.g. "model", "effortLevel", "autoCompactWindow"). The
+sidecar records the value this config last wrote per key under
+"managed_defaults". Semantics per key K with shared value V:
+
+- K absent from user settings          -> set user[K] = V (tracked).
+- user[K] == V                         -> adopt as managed (tracked, no write).
+- user[K] == last value we wrote       -> repo default changed; follow it.
+- user[K] is anything else             -> user deviated; leave it alone and
+                                          stop tracking. The user owns the key
+                                          until they delete it (deleting it
+                                          re-applies the default on next run).
+- K dropped from shared settings       -> user keeps their value; defaults are
+                                          additive — unmanaging a key never
+                                          unsets it.
 """
 
 from __future__ import annotations
@@ -258,6 +277,39 @@ def add_current_shared_hooks(user_hooks: dict, shared_hooks: dict) -> int:
     return added
 
 
+def merge_defaults(
+    shared: dict, user: dict, previous_defaults: dict
+) -> tuple[dict, int, int]:
+    """Merge top-level managed defaults (every shared key except "hooks").
+
+    Set-if-absent, plus repo-side changes propagate only while the user's
+    value still equals what this config last wrote (or adopted). A user who
+    has deviated owns the key; a key dropped from shared keeps its user value
+    (defaults are additive — unmanaging never unsets).
+
+    Returns (new_sidecar_defaults, set_count, updated_count).
+    """
+
+    new_defaults: dict = {}
+    set_count = 0
+    updated_count = 0
+    for key, value in shared.items():
+        if key == "hooks":
+            continue
+        if key not in user:
+            user[key] = value
+            new_defaults[key] = value
+            set_count += 1
+        elif user[key] == value:
+            new_defaults[key] = value
+        elif key in previous_defaults and user[key] == previous_defaults[key]:
+            user[key] = value
+            new_defaults[key] = value
+            updated_count += 1
+        # else: user deviated — leave their value, stop tracking the key
+    return new_defaults, set_count, updated_count
+
+
 def merge_settings(shared_path: str, user_path: str, sidecar_path: str) -> dict:
     """Run the merge. Returns a stats dict for the caller to print."""
 
@@ -291,11 +343,20 @@ def merge_settings(shared_path: str, user_path: str, sidecar_path: str) -> dict:
     dropped = drop_stale_managed_hooks(user_hooks, previous_hashes, current_hashes)
     added = add_current_shared_hooks(user_hooks, shared_hooks)
 
+    previous_defaults = sidecar.get("managed_defaults", {})
+    new_defaults, defaults_set, defaults_updated = merge_defaults(
+        shared, user, previous_defaults
+    )
+
     with open(user_path, "w", encoding="utf-8") as f:
         json.dump(user, f, indent=2)
         f.write("\n")
 
-    sidecar = {"version": SIDECAR_VERSION, "managed_hooks": sorted(current_hashes)}
+    sidecar = {
+        "version": SIDECAR_VERSION,
+        "managed_hooks": sorted(current_hashes),
+        "managed_defaults": new_defaults,
+    }
     with open(sidecar_path, "w", encoding="utf-8") as f:
         json.dump(sidecar, f, indent=2)
         f.write("\n")
@@ -305,6 +366,9 @@ def merge_settings(shared_path: str, user_path: str, sidecar_path: str) -> dict:
         "dropped": dropped,
         "added": added,
         "total_managed": len(current_hashes),
+        "defaults_set": defaults_set,
+        "defaults_updated": defaults_updated,
+        "defaults_managed": len(new_defaults),
     }
 
 
@@ -323,6 +387,12 @@ def main() -> int:
         parts.append(f"-{stats['dropped']} stale removed")
     if stats["migrated"]:
         parts.append(f"-{stats['migrated']} first-run cleanup")
+    if stats["defaults_managed"]:
+        parts.append(f"{stats['defaults_managed']} default(s) managed")
+    if stats["defaults_set"]:
+        parts.append(f"+{stats['defaults_set']} default(s) set")
+    if stats["defaults_updated"]:
+        parts.append(f"~{stats['defaults_updated']} default(s) updated")
     print(", ".join(parts))
     return 0
 
