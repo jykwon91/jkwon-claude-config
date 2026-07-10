@@ -1,4 +1,7 @@
 {
+  "model": "opus",
+  "effortLevel": "high",
+  "autoCompactWindow": 300000,
   "hooks": {
     "PreToolUse": [
       {

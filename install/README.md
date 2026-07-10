@@ -5,10 +5,13 @@ top-level installer doesn't accumulate untested inline heredocs.
 
 ## `merge-settings.py`
 
-Merges the shared `settings.json` hooks block into the user's
-`~/.claude/settings.json`. Tracks which hook entries were installed via a
-sidecar at `~/.claude/.jkwon-config-managed-hooks.json` so subsequent runs
-can remove stale ones (renamed, removed, arg-changed, `if`-field-changed).
+Merges the shared `settings.json` into the user's `~/.claude/settings.json`:
+the `hooks` block plus every other top-level key as a *managed default*
+(e.g. `model`, `effortLevel`, `autoCompactWindow`). Tracks which hook entries
+and default values were installed via a sidecar at
+`~/.claude/.jkwon-config-managed-hooks.json` so subsequent runs can remove
+stale hooks (renamed, removed, arg-changed, `if`-field-changed) and follow
+repo-side default changes without stomping user deviations.
 
 Usage (called by `install.sh` automatically):
 
@@ -35,6 +38,12 @@ Prints a one-line summary like `5 managed, +2 added, -1 stale removed`.
     heuristic can't see — mojibake, whitespace drift, refactors). The
     `if` field is required for this match to fire; without it the
     coordinates would over-match legitimate user hooks.
+- **Managed defaults** (top-level keys other than `hooks`): set when absent;
+  a repo-side change follows through only while the user's value still equals
+  the value this config last wrote (or adopted when it matched). A user who
+  changes the value owns the key from then on; deleting the key re-applies
+  the default on the next run. Dropping a key from the shared config stops
+  managing it but never unsets it.
 
 ### What is NOT a user-editable file
 
@@ -51,6 +60,8 @@ local hook entry (with a command that doesn't reference
 python install/test_merge_settings.py
 ```
 
-14 cases cover each failure mode the previous inline merge missed, plus
+23 cases cover each failure mode the previous inline merge missed, plus
 idempotency, user-added preservation, both first-run migration heuristics,
-and the signature heuristic's no-`if` carve-out that protects user hooks.
+the signature heuristic's no-`if` carve-out that protects user hooks, and
+the managed-defaults semantics (set-if-absent, follow-repo-while-unchanged,
+deviation ownership, additive drops).
