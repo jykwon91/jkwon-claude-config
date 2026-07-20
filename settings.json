@@ -16,6 +16,13 @@
           },
           {
             "type": "command",
+            "if": "Bash(*)",
+            "command": "node $HOME/.claude/hooks/block-git-clean.js",
+            "timeout": 5000,
+            "statusMessage": "Guarding against irreversible git clean of untracked files..."
+          },
+          {
+            "type": "command",
             "if": "Bash(git commit*)",
             "command": "node $HOME/.claude/hooks/block-commit-to-main.js",
             "timeout": 5000,
