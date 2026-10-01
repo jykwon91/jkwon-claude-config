@@ -137,7 +137,7 @@ Output:
 
 ## pr-quality-gate
 
-PreToolUse hook on `Bash(gh pr create*)`. Before a PR is opened, reviews the current branch against `main` and **blocks** `gh pr create` if quality standards are not met (missing/meaningless E2E tests, ORM in services/routes, multiple components per `.tsx` file, `: any` typing, magic-string state values, nested JSX ternaries). Allows the command (`{}`) otherwise.
+PreToolUse hook on `Bash(gh pr create*)`. Before a PR is opened, reviews the current branch against `origin/main` (fetched first — never the local `main` ref, which worktree workflows leave stale; a stale base made the gate judge every file merged since and block PRs on files they never touched) and **blocks** `gh pr create` if quality standards are not met (missing/meaningless E2E tests, ORM in services/routes, multiple components per `.tsx` file, `: any` typing, magic-string state values, nested JSX ternaries). Allows the command (`{}`) otherwise.
 
 **Why it's a `command` hook, not an `agent` hook.** This logic used to be a `type: "agent"` hook in `settings.json` gated only by `if: "Bash(gh pr create*)"`. Per [`rules/claude-code-hook-if-field-unreliable.md`](../rules/claude-code-hook-if-field-unreliable.md) the `if` field does not reliably filter a Bash-matcher hook, and an `agent` hook has no body in which to self-gate — so it fired a ~120s Haiku review on **every** Bash tool call and could block any git command in auto mode. It is now a `type: "command"` hook that reads the triggering command from stdin and self-gates: the review only runs when the command is actually `gh pr create` (matched at the start of the command or after an `&&` chain).
 
